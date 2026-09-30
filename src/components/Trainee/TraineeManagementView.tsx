@@ -42,6 +42,7 @@ export const TraineeManagementView: React.FC = () => {
     addUser,
     deleteUser,
     deleteUsersByRole,
+    deleteTraineesByIds,
     addKejuruan,
     importUsers,
     regenerateUserCredentials
@@ -59,6 +60,8 @@ export const TraineeManagementView: React.FC = () => {
   const [clearRoleTarget, setClearRoleTarget] = useState<'trainee' | 'mentor' | 'all'>('trainee');
   const [confirmWord, setConfirmWord] = useState<string>('');
   const [isProcessingClear, setIsProcessingClear] = useState<boolean>(false);
+  const [selectedTraineeIds, setSelectedTraineeIds] = useState<string[]>([]);
+  const [isProcessingSelectedDelete, setIsProcessingSelectedDelete] = useState(false);
 
   // Copied feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -330,6 +333,7 @@ export const TraineeManagementView: React.FC = () => {
     if (clearRoleTarget === 'mentor') return mentors.length;
     return trainees.length + mentors.length;
   }, [clearRoleTarget, trainees.length, mentors.length]);
+  const selectedTraineeCount = selectedTraineeIds.filter(id => trainees.some(user => user.id === id)).length;
 
   const handleOpenClearModal = (role?: 'trainee' | 'mentor' | 'all') => {
     const chosenRole = role || (activeRoleFilter === 'mentor' ? 'mentor' : activeRoleFilter === 'trainee' ? 'trainee' : 'all');
@@ -346,6 +350,22 @@ export const TraineeManagementView: React.FC = () => {
     setIsClearModalOpen(false);
     setConfirmWord('');
     showToast(res.message);
+  };
+
+  const toggleTraineeSelection = (userId: string) => {
+    setSelectedTraineeIds(previous => previous.includes(userId)
+      ? previous.filter(id => id !== userId)
+      : [...previous, userId]);
+  };
+
+  const handleDeleteSelectedTrainees = async () => {
+    const ids = selectedTraineeIds.filter(id => trainees.some(user => user.id === id));
+    if (!ids.length || !window.confirm(`Hapus ${ids.length} akun peserta yang dipilih? Tindakan ini tidak dapat dibatalkan.`)) return;
+    setIsProcessingSelectedDelete(true);
+    const result = await deleteTraineesByIds(ids);
+    setIsProcessingSelectedDelete(false);
+    if (result.success) setSelectedTraineeIds(previous => previous.filter(id => !ids.includes(id)));
+    showToast(result.message);
   };
 
   return (
@@ -380,6 +400,18 @@ export const TraineeManagementView: React.FC = () => {
             >
               <Trash2 className="w-4 h-4 text-rose-500" />
               <span>Hapus Semua</span>
+            </button>
+          )}
+          {currentUser?.role === 'admin' && selectedTraineeCount > 0 && (
+            <button
+              type="button"
+              onClick={handleDeleteSelectedTrainees}
+              disabled={isProcessingSelectedDelete}
+              className="surface px-3.5 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-xs font-bold text-rose-600 transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+              title="Hapus peserta yang dipilih"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{isProcessingSelectedDelete ? 'Menghapus...' : `Hapus Terpilih (${selectedTraineeCount})`}</span>
             </button>
           )}
 
@@ -524,6 +556,7 @@ export const TraineeManagementView: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-[#F8FAFB] border-b border-[#E4EAF0] text-[#6F7F8D] text-[10px] font-bold tracking-wide uppercase">
+                <th className="py-3 px-2 w-10 text-center"></th>
                 <th className="py-3 px-3.5 w-10 text-center">No</th>
                 <th className="py-3 px-3 min-w-[200px]">Nama Pengguna</th>
                 <th className="py-3 px-3 w-28">Peran (Role)</th>
@@ -538,7 +571,7 @@ export const TraineeManagementView: React.FC = () => {
             <tbody className="divide-y divide-[#E4EAF0]">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#6F7F8D] italic">
+                  <td colSpan={8} className="py-8 text-center text-[#6F7F8D] italic">
                     Tidak ada data akun yang cocok dengan filter pencarian.
                   </td>
                 </tr>
@@ -550,6 +583,17 @@ export const TraineeManagementView: React.FC = () => {
 
                   return (
                     <tr key={user.id} className="hover:bg-[#F8FAFB]/60 transition">
+                      <td className="py-3 px-2 text-center">
+                        {currentUser?.role === 'admin' && user.role === 'trainee' && (
+                          <input
+                            type="checkbox"
+                            checked={selectedTraineeIds.includes(user.id)}
+                            onChange={() => toggleTraineeSelection(user.id)}
+                            aria-label={`Pilih peserta ${user.name}`}
+                            className="h-4 w-4 accent-[#123B59]"
+                          />
+                        )}
+                      </td>
                       <td className="py-3 px-3.5 text-center text-[#6F7F8D] tabular-nums font-semibold">
                         {idx + 1}
                       </td>

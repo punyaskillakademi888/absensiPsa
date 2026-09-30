@@ -23,7 +23,8 @@ import {
   FileText,
   UserCheck,
   Calendar,
-  Flame
+  Flame,
+  RotateCcw
 } from 'lucide-react';
 import { formatIndonesianDate, getTodayDateString } from '../../utils/dateUtils';
 import { getMentorKejuruanIds } from '../../utils/mentorKejuruan';
@@ -61,6 +62,7 @@ export const MissionManagementView: React.FC = () => {
     deleteMission,
     submitMissionWork,
     reviewMissionSubmission,
+    resetMentorMissionData,
     getUserPoints,
     refreshMissions,
     jwtToken
@@ -316,6 +318,12 @@ export const MissionManagementView: React.FC = () => {
         showToast(error instanceof Error ? `Gagal menghapus misi: ${error.message}` : 'Gagal menghapus misi dari server.');
       }
     }
+  };
+
+  const handleResetMissionData = async () => {
+    if (!window.confirm('Hapus semua misi dan seluruh submission/review beserta poin peserta untuk misi yang Anda kelola? Tindakan ini tidak dapat dibatalkan.')) return;
+    const result = await resetMentorMissionData();
+    showToast(result.message);
   };
 
   // Trainee Submission Modal
@@ -717,6 +725,16 @@ export const MissionManagementView: React.FC = () => {
               <p className="text-xs text-[#6F7F8D]">
                 Tinjau bukti pengerjaan peserta, verifikasi kualitas tugas, dan tetapkan perolehan poin.
               </p>
+              {isMentor && (
+                <button
+                  type="button"
+                  onClick={() => void handleResetMissionData()}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-50"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset Semua Data Misi &amp; Review Saya
+                </button>
+              )}
             </div>
             <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#EAF2F8] text-[#28618F]">
               Total {relevantSubmissions.length} Tugas

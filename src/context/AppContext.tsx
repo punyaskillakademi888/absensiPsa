@@ -45,6 +45,7 @@ interface AppContextType {
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   // Clock in/out actions
   refreshAttendanceRecords: () => Promise<void>;
+  resetAttendanceRecords: () => Promise<{ success: boolean; count: number; message: string }>;
   clockIn: (notes?: string, photoUrl?: string, coordinates?: { lat: number; lng: number }, workMode?: 'WFO' | 'WFH') => Promise<{ success: boolean; message: string }>;
   clockOut: (notes?: string, coordinates?: { lat: number; lng: number }) => Promise<{ success: boolean; message: string }>;
   getTodayRecordForUser: (userId: string) => AttendanceRecord | undefined;
@@ -63,6 +64,8 @@ interface AppContextType {
   ) => Promise<{ success: boolean; message: string }>;
   // Missions & Points system
   refreshMissions: () => Promise<void>;
+  resetTraineeHallOfFamePoints: () => Promise<{ success: boolean; count: number; message: string }>;
+  resetMentorMissionData: () => Promise<{ success: boolean; missions: number; submissions: number; message: string }>;
   addMission: (missionData: Omit<Mission, 'id' | 'createdAt'>) => Promise<void>;
   updateMission: (id: string, updates: Partial<Mission>) => void;
   deleteMission: (id: string) => Promise<void>;
@@ -112,6 +115,7 @@ interface AppContextType {
   updateMyAvatar: (avatar: string) => Promise<{ success: boolean; message: string }>;
   deleteUser: (id: string) => Promise<{ success: boolean; message: string }>;
   deleteUsersByRole: (role: 'trainee' | 'mentor' | 'all') => Promise<{ success: boolean; count: number; message: string }>;
+  deleteTraineesByIds: (ids: string[]) => Promise<{ success: boolean; count: number; message: string }>;
   importUsers: (importedUsers: Partial<User>[]) => Promise<{ success: boolean; count: number; message: string }>;
   regenerateUserCredentials: (userId: string) => Promise<{ loginCode: string; password: string; success: boolean; message?: string }>;
   addKejuruan: (kjData: Omit<Kejuruan, 'id'>) => void;
@@ -428,6 +432,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Could not refresh attendance records from TiDB:', error);
     }
   }, [jwtToken]);
+
+  const resetAttendanceRecords = async (): Promise<{ success: boolean; count: number; message: string }> => {
+    try {
+      const result = await api.resetAttendanceRecords();
+      if (result.success) setAttendanceRecords([]);
+      return result;
+    } catch (error: any) {
+      return { success: false, count: 0, message: error.message || 'Tidak dapat mereset data presensi di TiDB.' };
+    }
+  };
 
   const refreshUsers = useCallback(async () => {
     if (!jwtToken || (currentUser.role !== 'mentor' && currentUser.role !== 'admin')) return;
@@ -862,6 +876,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const deleteTraineesByIds = async (ids: string[]): Promise<{ success: boolean; count: number; message: string }> => {
+    try {
+      const result = await api.deleteTraineesByIds(ids);
+      if (result.success) {
+        const deletedIds = new Set(ids);
+        setUsers(previous => previous.filter(user => !deletedIds.has(user.id)));
+      }
+      return result;
+    } catch (error: any) {
+      console.warn('API deleteTraineesByIds failed:', error);
+      return { success: false, count: 0, message: error.message || 'Tidak dapat menghapus peserta dari TiDB.' };
+    }
+  };
+
   const regenerateUserCredentials = async (
     userId: string
   ): Promise<{ loginCode: string; password: string; success: boolean; message?: string }> => {
@@ -948,6 +976,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Could not refresh missions and submissions from TiDB:', error);
     }
   }, [jwtToken]);
+
+  const resetTraineeHallOfFamePoints = async (): Promise<{ success: boolean; count: number; message: string }> => {
+    try {
+      const result = await api.resetTraineeHallOfFamePoints();
+      if (result.success) {
+        setMissionSubmissions(previous => previous.map(submission => ({ ...submission, points: 0 })));
+      }
+      return result;
+    } catch (error: any) {
+      return { success: false, count: 0, message: error.message || 'Tidak dapat mereset poin HOF peserta.' };
+    }
+  };
+
+  const resetMentorMissionData = async (): Promise<{ success: boolean; missions: number; submissions: number; message: string }> => {
+    try {
+      const result = await api.resetMentorMissionData();
+      if (result.success) {
+        setMissions(previous => previous.filter(mission => mission.mentorId !== currentUser.id));
+        setMissionSubmissions(previous => previous.filter(submission =>
+          !missions.some(mission => mission.mentorId === currentUser.id && mission.id === submission.missionId)
+        ));
+      }
+      return result;
+    } catch (error: any) {
+      return { success: false, missions: 0, submissions: 0, message: error.message || 'Tidak dapat membersihkan data misi.' };
+    }
+  };
 
   const addMission = async (missionData: Omit<Mission, 'id' | 'createdAt'>) => {
     const id = `msn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1193,8 +1248,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clockIn,
         clockOut,
         refreshAttendanceRecords,
+        resetAttendanceRecords,
         getTodayRecordForUser,
         refreshMissions,
+        resetTraineeHallOfFamePoints,
+        resetMentorMissionData,
         submitLeaveRequest,
         reviewLeaveRequest,
         verifyAttendance,
@@ -1213,6 +1271,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateMyAvatar,
         deleteUser,
         deleteUsersByRole,
+        deleteTraineesByIds,
         importUsers,
         regenerateUserCredentials,
         addKejuruan,

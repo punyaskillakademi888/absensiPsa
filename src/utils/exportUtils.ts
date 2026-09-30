@@ -85,14 +85,7 @@ export function computeMonthlyRecapData(params: ExportParams): {
       const record = records.find(r => r.userId === trainee.id && r.date === dateStr);
 
       if (!record) {
-        // If it's a past working day, count as Alpha or not yet recorded
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (dateStr <= todayStr) {
-          alpha++;
-          dailyStatus[day] = 'A';
-        } else {
-          dailyStatus[day] = '-';
-        }
+        dailyStatus[day] = '-';
       } else {
         switch (record.status) {
           case 'hadir':

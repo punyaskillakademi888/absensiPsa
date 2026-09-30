@@ -1,6 +1,6 @@
 import {
   User, Kejuruan, AttendanceRecord, LeaveRequest, AttendanceSettings,
-  Mission, MissionSubmission, DailyReport, TraineeHallOfFameEntry
+  Mission, MissionSubmission, DailyReport, TraineeHallOfFameEntry, MentorHallOfFameEntry
 } from '../types';
 
 function resolveApiBaseUrl(): string {
@@ -146,6 +146,22 @@ export const api = {
     return this.request<{ success: boolean; trainees: TraineeHallOfFameEntry[] }>('/api/app-data/hall-of-fame/trainees');
   },
 
+  async getMentorHallOfFame(): Promise<{ success: boolean; mentors: MentorHallOfFameEntry[] }> {
+    return this.request<{ success: boolean; mentors: MentorHallOfFameEntry[] }>('/api/app-data/hall-of-fame/mentors');
+  },
+
+  async resetTraineeHallOfFamePoints(): Promise<{ success: boolean; count: number; message: string }> {
+    return this.request<{ success: boolean; count: number; message: string }>('/api/app-data/hall-of-fame/reset-trainee-points', {
+      method: 'POST',
+    });
+  },
+
+  async resetMentorMissionData(): Promise<{ success: boolean; missions: number; submissions: number; message: string }> {
+    return this.request<{ success: boolean; missions: number; submissions: number; message: string }>('/api/app-data/missions/reset', {
+      method: 'POST',
+    });
+  },
+
   async saveAppData(data: AppDataSnapshot): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>('/api/app-data', {
       method: 'PUT',
@@ -164,6 +180,12 @@ export const api = {
     return this.request<{ success: boolean; message: string; duplicate?: boolean; attendanceRecord: AttendanceRecord }>('/api/app-data/attendance', {
       method: 'PUT',
       body: JSON.stringify(record),
+    });
+  },
+
+  async resetAttendanceRecords(): Promise<{ success: boolean; count: number; message: string }> {
+    return this.request<{ success: boolean; count: number; message: string }>('/api/attendance/reset', {
+      method: 'DELETE',
     });
   },
 
@@ -266,6 +288,13 @@ export const api = {
   ): Promise<{ success: boolean; count: number; message: string }> {
     return this.request<{ success: boolean; count: number; message: string }>(`/api/users/clear/${role}`, {
       method: 'DELETE',
+    });
+  },
+
+  async deleteTraineesByIds(ids: string[]): Promise<{ success: boolean; count: number; message: string }> {
+    return this.request<{ success: boolean; count: number; message: string }>('/api/users/batch-delete-trainees', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
     });
   },
 

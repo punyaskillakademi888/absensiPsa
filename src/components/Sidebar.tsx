@@ -145,7 +145,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return [
         { id: 'verifikasi-mentor', label: 'Verifikasi Mentor', icon: CheckCircle2, badge: pendingMentorVerifications },
         { id: 'laporan-harian', label: 'Laporan Harian', icon: BookOpen, badge: pendingDailyReportsCount },
-        { id: 'misi', label: 'Misi & Tugas Kejuruan', icon: Target, badge: pendingMissionsCount },
         { id: 'hall-of-fame', label: 'Hall of Fame Mentor', icon: Trophy },
         { id: 'rekap', label: 'Rekapitulasi Presensi', icon: FileSpreadsheet },
         { id: 'peserta', label: 'Peserta & Kejuruan', icon: Users },

@@ -42,6 +42,15 @@ export interface TraineeHallOfFameEntry {
   completedMissionsCount: number;
 }
 
+export interface MentorHallOfFameEntry {
+  id: string;
+  nim: string;
+  name: string;
+  kejuruanName?: string;
+  totalPoints: number;
+  completedMissionsCount: number;
+}
+
 export interface AttendanceRecord {
   id: string;
   userId: string;

@@ -958,6 +958,61 @@ app.delete(
   }
 );
 
+app.post(
+  '/api/users/batch-delete-trainees',
+  authenticateToken,
+  authorizeRoles('admin'),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const requestedIds = req.body?.ids;
+    if (
+      !Array.isArray(requestedIds) ||
+      requestedIds.length === 0 ||
+      requestedIds.length > 500 ||
+      !requestedIds.every(id => typeof id === 'string' && id.trim().length > 0 && id.trim().length <= 64)
+    ) {
+      return res.status(400).json({ success: false, message: 'Pilih 1 sampai 500 ID peserta yang valid.' });
+    }
+
+    try {
+      const ids = [...new Set((requestedIds as string[]).map(id => id.trim()))];
+      const placeholders = ids.map(() => '?').join(',');
+      const [result]: any = await getPool().query(
+        `DELETE FROM users WHERE role = 'trainee' AND id IN (${placeholders})`,
+        ids
+      );
+      const count = Number(result?.affectedRows || 0);
+      return res.json({
+        success: true,
+        count,
+        message: `Berhasil menghapus ${count} akun peserta terpilih dari TiDB. Akun admin dan mentor tetap aman.`,
+      });
+    } catch (error: any) {
+      console.error('[Batch Delete Trainees Error]', error);
+      return res.status(500).json({ success: false, message: 'Gagal menghapus peserta terpilih dari TiDB.' });
+    }
+  }
+);
+
+app.delete(
+  '/api/attendance/reset',
+  authenticateToken,
+  authorizeRoles('admin'),
+  async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const [result]: any = await getPool().query('DELETE FROM attendance_records');
+      const count = Number(result?.affectedRows || 0);
+      return res.json({
+        success: true,
+        count,
+        message: `Reset presensi berhasil. ${count} catatan presensi dihapus dari TiDB.`,
+      });
+    } catch (error: any) {
+      console.error('[Reset Attendance Error]', error);
+      return res.status(500).json({ success: false, count: 0, message: 'Gagal mereset data presensi di TiDB.' });
+    }
+  }
+);
+
 const mapMission = (row: any) => ({
   id: row.id,
   title: row.title,
@@ -1029,7 +1084,7 @@ app.post('/api/missions', authenticateToken, authorizeRoles('mentor'), async (re
   }
 });
 
-app.put('/api/missions/:id', authenticateToken, authorizeRoles('admin', 'mentor'), async (req: AuthenticatedRequest, res) => {
+app.put('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), async (req: AuthenticatedRequest, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query<any[]>('SELECT * FROM missions WHERE id = ? LIMIT 1', [req.params.id]);
@@ -1059,17 +1114,15 @@ app.put('/api/missions/:id', authenticateToken, authorizeRoles('admin', 'mentor'
   }
 });
 
-app.delete('/api/missions/:id', authenticateToken, authorizeRoles('admin', 'mentor'), async (req: AuthenticatedRequest, res) => {
+app.delete('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), async (req: AuthenticatedRequest, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query<any[]>('SELECT * FROM missions WHERE id = ? LIMIT 1', [req.params.id]);
     const mission = rows[0];
     // DELETE is idempotent; a retry after a successful delete stays successful.
     if (!mission) return res.json({ success: true, message: 'Misi sudah dihapus.' });
-    if (req.user?.role === 'mentor') {
-      if (!mentorCanManageProgram(req, mission.kejuruan_id, mission.kejuruan_name)) {
-        return res.status(403).json({ success: false, message: 'Anda tidak dapat menghapus misi dari kejuruan ini.' });
-      }
+    if (mission.mentor_id !== req.user?.id || !mentorCanManageProgram(req, mission.kejuruan_id, mission.kejuruan_name)) {
+      return res.status(403).json({ success: false, message: 'Anda tidak dapat menghapus misi ini.' });
     }
     await pool.query('DELETE FROM missions WHERE id = ?', [req.params.id]);
     res.json({ success: true, message: 'Misi berhasil dihapus.' });

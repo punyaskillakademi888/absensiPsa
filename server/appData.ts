@@ -256,6 +256,106 @@ appDataRouter.get('/hall-of-fame/trainees', authenticateToken, async (req: Authe
   }
 });
 
+appDataRouter.get('/hall-of-fame/mentors', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'mentor') {
+    return res.status(403).json({ success: false, message: 'Peringkat mentor hanya tersedia untuk admin dan mentor.' });
+  }
+
+  try {
+    const mentorScope = req.user.role === 'mentor' ? 'AND mentor.id = ?' : '';
+    const [rows] = await getPool().query<any[]>(`
+      SELECT mentor.id, mentor.nim, mentor.name, mentor.kejuruan_name,
+             COUNT(DISTINCT CASE WHEN submission.status = 'approved' THEN submission.id END) AS completed_missions_count,
+             COALESCE(SUM(
+               CASE WHEN submission.status = 'approved'
+                 THEN submission.points / COALESCE(NULLIF(trainee_counts.active_trainees, 0), 1)
+                 ELSE 0
+               END
+             ), 0) AS total_points
+      FROM users mentor
+      LEFT JOIN missions mission ON mission.mentor_id = mentor.id
+      LEFT JOIN mission_submissions submission ON submission.mission_id = mission.id
+      LEFT JOIN (
+        SELECT kejuruan_id, COUNT(*) AS active_trainees
+        FROM users
+        WHERE role = 'trainee' AND status = 'active'
+        GROUP BY kejuruan_id
+      ) trainee_counts ON trainee_counts.kejuruan_id = mission.kejuruan_id
+      WHERE mentor.role = 'mentor' ${mentorScope}
+      GROUP BY mentor.id, mentor.nim, mentor.name, mentor.kejuruan_name
+      ORDER BY total_points DESC, completed_missions_count DESC, mentor.name ASC
+    `, req.user.role === 'mentor' ? [req.user.id] : []);
+
+    return res.json({
+      success: true,
+      mentors: rows.map((row: any) => ({
+        id: row.id,
+        nim: row.nim,
+        name: row.name,
+        kejuruanName: row.kejuruan_name || undefined,
+        totalPoints: Number(Number(row.total_points).toFixed(1)),
+        completedMissionsCount: Number(row.completed_missions_count),
+      })),
+    });
+  } catch (error: any) {
+    console.error('[Mentor Hall of Fame Error]', error);
+    return res.status(500).json({ success: false, message: 'Gagal memuat peringkat mentor.' });
+  }
+});
+
+appDataRouter.post('/hall-of-fame/reset-trainee-points', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Hanya admin yang dapat mereset poin Hall of Fame peserta.' });
+  }
+
+  try {
+    const [result]: any = await getPool().query('UPDATE mission_submissions SET points = 0 WHERE points <> 0');
+    const count = Number(result?.affectedRows || 0);
+    return res.json({
+      success: true,
+      count,
+      message: `Poin HOF peserta berhasil direset untuk ${count} submission. Riwayat submission tetap tersimpan.`,
+    });
+  } catch (error: any) {
+    console.error('[Reset Trainee HOF Points Error]', error);
+    return res.status(500).json({ success: false, count: 0, message: 'Gagal mereset poin HOF peserta.' });
+  }
+});
+
+appDataRouter.post('/missions/reset', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'mentor') {
+    return res.status(403).json({ success: false, missions: 0, submissions: 0, message: 'Hanya mentor yang dapat mereset data misi.' });
+  }
+
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    const [missions] = await connection.query<any[]>('SELECT id FROM missions WHERE mentor_id = ?', [req.user.id]);
+    const missionIds = missions.map((mission: any) => String(mission.id));
+    let submissionCount = 0;
+    if (missionIds.length) {
+      const placeholders = missionIds.map(() => '?').join(',');
+      const [result]: any = await connection.query(`DELETE FROM mission_submissions WHERE mission_id IN (${placeholders})`, missionIds);
+      submissionCount = Number(result?.affectedRows || 0);
+    }
+    const [missionResult]: any = await connection.query('DELETE FROM missions WHERE mentor_id = ?', [req.user.id]);
+    const missionCount = Number(missionResult?.affectedRows || 0);
+    await connection.commit();
+    return res.json({
+      success: true,
+      missions: missionCount,
+      submissions: submissionCount,
+      message: `Data misi berhasil dibersihkan: ${missionCount} misi dan ${submissionCount} tugas/review dihapus beserta poinnya.`,
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('[Reset Mission Submission Points Error]', error);
+    return res.status(500).json({ success: false, missions: 0, submissions: 0, message: 'Gagal membersihkan data misi.' });
+  } finally {
+    connection.release();
+  }
+});
+
 appDataRouter.put('/settings', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Hanya admin yang dapat mengubah pengaturan lokasi presensi.' });

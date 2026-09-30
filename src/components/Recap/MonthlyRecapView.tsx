@@ -14,7 +14,8 @@ import {
   ChevronUp,
   Calendar,
   Sparkles,
-  UserCheck
+  UserCheck,
+  Trash2
 } from 'lucide-react';
 import { INDONESIAN_MONTHS, getTodayDateString } from '../../utils/dateUtils';
 import { computeMonthlyRecapData, exportToExcel, exportToPDF } from '../../utils/exportUtils';
@@ -22,7 +23,7 @@ import { getMentorKejuruanIds } from '../../utils/mentorKejuruan';
 import { getKejuruanFilterOptions } from '../../utils/kejuruanCodes';
 
 export const MonthlyRecapView: React.FC = () => {
-  const { users, kejuruanList, attendanceRecords, currentUser, dailyReports, setActiveTab } = useApp();
+  const { users, kejuruanList, attendanceRecords, currentUser, dailyReports, setActiveTab, resetAttendanceRecords } = useApp();
 
   const isTrainee = currentUser.role === 'trainee';
   const isMentor = currentUser.role === 'mentor';
@@ -46,6 +47,7 @@ export const MonthlyRecapView: React.FC = () => {
   const [selectedKejuruanId, setSelectedKejuruanId] = useState<string>(defaultKj);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterPredicate, setFilterPredicate] = useState<string>('all');
+  const [isResettingAttendance, setIsResettingAttendance] = useState(false);
 
   // Date detail dropdown selector (Default: 'summary', or specific day 1..31, or 'all-days')
   const [selectedDayFilter, setSelectedDayFilter] = useState<string>('summary');
@@ -151,6 +153,14 @@ export const MonthlyRecapView: React.FC = () => {
     });
   };
 
+  const handleResetAttendance = async () => {
+    if (!window.confirm('Hapus seluruh catatan presensi dari TiDB? Akun pengguna, pengajuan izin, dan laporan harian tidak akan dihapus.')) return;
+    setIsResettingAttendance(true);
+    const result = await resetAttendanceRecords();
+    setIsResettingAttendance(false);
+    window.alert(result.message);
+  };
+
   const getStatusBadge = (statusChar: string) => {
     switch (statusChar) {
       case 'H':
@@ -199,6 +209,18 @@ export const MonthlyRecapView: React.FC = () => {
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {currentUser.role === 'admin' && (
+            <button
+              type="button"
+              onClick={handleResetAttendance}
+              disabled={isResettingAttendance}
+              className="surface px-3.5 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-xs font-bold text-rose-600 transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+              title="Hapus seluruh catatan presensi dari TiDB"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{isResettingAttendance ? 'Mereset...' : 'Reset Presensi'}</span>
+            </button>
+          )}
           <button
             onClick={handleExportExcel}
             className="surface px-3.5 py-2.5 rounded-xl border border-[#E4EAF0] hover:bg-[#F8FAFB] text-xs font-bold text-[#123B59] transition flex items-center gap-1.5 cursor-pointer shadow-xs"
