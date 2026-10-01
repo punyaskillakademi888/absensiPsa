@@ -342,4 +342,15 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  async reviewMissionSubmission(id: string, review: {
+    status: 'approved' | 'rejected';
+    feedback: string;
+    points: number;
+  }): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/api/missions/submissions/${encodeURIComponent(id)}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify(review),
+    });
+  },
 };

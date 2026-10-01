@@ -142,6 +142,7 @@ export const MissionManagementView: React.FC = () => {
   const [selectedSubmissionForReview, setSelectedSubmissionForReview] = useState<MissionSubmission | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewAwardedPoints, setReviewAwardedPoints] = useState<number>(100);
+  const [isReviewSaving, setIsReviewSaving] = useState(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -366,20 +367,27 @@ export const MissionManagementView: React.FC = () => {
     setIsReviewModalOpen(true);
   };
 
-  const handleConfirmReview = (status: 'approved' | 'rejected') => {
-    if (!selectedSubmissionForReview) return;
-    reviewMissionSubmission(
-      selectedSubmissionForReview.id,
-      status,
-      reviewFeedback.trim() || (status === 'approved' ? 'Tugas disetujui dengan predikat memuaskan.' : 'Perlu perbaikan sesuai arahan instruktur.'),
-      Number(reviewAwardedPoints)
-    );
-    showToast(
-      status === 'approved'
-        ? `Tugas disetujui! ${reviewAwardedPoints} poin berhasil diberikan kepada ${selectedSubmissionForReview.traineeName}.`
-        : `Tugas peserta ${selectedSubmissionForReview.traineeName} telah ditolak dengan catatan evaluasi.`
-    );
-    setIsReviewModalOpen(false);
+  const handleConfirmReview = async (status: 'approved' | 'rejected') => {
+    if (!selectedSubmissionForReview || isReviewSaving) return;
+    setIsReviewSaving(true);
+    try {
+      await reviewMissionSubmission(
+        selectedSubmissionForReview.id,
+        status,
+        reviewFeedback.trim() || (status === 'approved' ? 'Tugas disetujui dengan predikat memuaskan.' : 'Perlu perbaikan sesuai arahan instruktur.'),
+        Number(reviewAwardedPoints)
+      );
+      showToast(
+        status === 'approved'
+          ? `Tugas disetujui! ${reviewAwardedPoints} poin berhasil diberikan kepada ${selectedSubmissionForReview.traineeName}.`
+          : `Tugas peserta ${selectedSubmissionForReview.traineeName} telah ditolak dengan catatan evaluasi.`
+      );
+      setIsReviewModalOpen(false);
+    } catch (error) {
+      showToast(error instanceof Error ? `Gagal menyimpan review: ${error.message}` : 'Gagal menyimpan review ke database.');
+    } finally {
+      setIsReviewSaving(false);
+    }
   };
 
   const getDifficultyBadge = (difficulty: MissionDifficulty) => {
@@ -900,7 +908,8 @@ export const MissionManagementView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveMission} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-5 space-y-4">
+            <form onSubmit={handleSaveMission} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-5 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               {isAdmin && <div>
                 <label className="block text-xs font-semibold text-[#123B59] mb-1">
                   Program Kejuruan Target
@@ -1033,7 +1042,8 @@ export const MissionManagementView: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E4EAF0]">
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[#E4EAF0] bg-white px-5 py-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -1156,7 +1166,7 @@ export const MissionManagementView: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain touch-pan-y p-5 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               {/* Trainee Details */}
               <div className="flex items-center gap-3 p-3 rounded-xl bg-[#F4F6F8] border border-[#E4EAF0]">
                 <img
@@ -1235,6 +1245,7 @@ export const MissionManagementView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleConfirmReview('rejected')}
+                  disabled={isReviewSaving}
                   className="px-3.5 py-2 rounded-lg bg-[#FCF3F6] hover:bg-[#D95B83] hover:text-white text-[#B84469] text-xs font-semibold transition cursor-pointer"
                 >
                   Tolak / Minta Revisi
@@ -1244,6 +1255,7 @@ export const MissionManagementView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsReviewModalOpen(false)}
+                    disabled={isReviewSaving}
                     className="px-3 py-2 rounded-lg border border-[#E4EAF0] text-xs text-[#6F7F8D] hover:bg-[#F4F6F8] transition cursor-pointer"
                   >
                     Batal
@@ -1251,10 +1263,11 @@ export const MissionManagementView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleConfirmReview('approved')}
+                    disabled={isReviewSaving}
                     className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Setujui &amp; Beri Poin</span>
+                    <span>{isReviewSaving ? 'Menyimpan...' : 'Setujui &amp; Beri Poin'}</span>
                   </button>
                 </div>
               </div>

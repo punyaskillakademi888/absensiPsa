@@ -79,7 +79,7 @@ interface AppContextType {
     status: 'approved' | 'rejected',
     feedback?: string,
     awardedPoints?: number
-  ) => void;
+  ) => Promise<void>;
   getUserPoints: (userId: string) => number;
   // Daily Reports
   dailyReports: DailyReport[];
@@ -1084,41 +1084,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Tugas misi berhasil dikirimkan ke Mentor untuk direview!' };
   };
 
-  const reviewMissionSubmission = (
+  const reviewMissionSubmission = async (
     submissionId: string,
     status: 'approved' | 'rejected',
     feedback?: string,
     awardedPoints?: number
   ) => {
-    setMissionSubmissions(prev =>
-      prev.map(sub => {
-        if (sub.id === submissionId) {
-          const updated: MissionSubmission = {
-            ...sub,
-            status,
-            points: awardedPoints !== undefined ? awardedPoints : sub.points,
-            reviewedBy: currentUser.name,
-            reviewedAt: `${getTodayDateString()} ${getCurrentTimeWIB()}`,
-            feedback
-          };
+    if (!jwtToken) throw new Error('Sesi tidak aktif. Silakan masuk kembali.');
+    const submission = missionSubmissions.find(item => item.id === submissionId);
+    if (!submission) throw new Error('Data pengumpulan tugas tidak ditemukan.');
 
-          if (status === 'approved') {
-            try {
-              confetti({
-                particleCount: 80,
-                spread: 70,
-                origin: { y: 0.6 }
-              });
-            } catch {
-              // Ignored
-            }
-          }
+    const reviewPoints = awardedPoints !== undefined ? awardedPoints : submission.points;
+    const reviewFeedback = feedback || '';
+    const response = await api.reviewMissionSubmission(submissionId, {
+      status,
+      feedback: reviewFeedback,
+      points: reviewPoints,
+    });
+    if (!response.success) throw new Error(response.message || 'Review gagal disimpan.');
 
-          return updated;
+    const updatedAt = `${getTodayDateString()} ${getCurrentTimeWIB()}`;
+    setMissionSubmissions(previous => previous.map(item => item.id === submissionId
+      ? {
+          ...item,
+          status,
+          points: reviewPoints,
+          reviewedBy: currentUser.name,
+          reviewedAt: updatedAt,
+          feedback: reviewFeedback,
         }
-        return sub;
-      })
-    );
+      : item
+    ));
+
+    if (status === 'approved') {
+      try {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      } catch {
+        // Ignored
+      }
+    }
   };
 
   const getUserPoints = (userId: string) => {

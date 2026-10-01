@@ -1126,6 +1126,41 @@ app.delete('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), asy
   }
 });
 
+app.patch('/api/missions/submissions/:id/review', authenticateToken, authorizeRoles('mentor', 'admin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { status, feedback, points } = req.body || {};
+    const awardedPoints = Number(points);
+    if (!['approved', 'rejected'].includes(status) || !Number.isInteger(awardedPoints) || awardedPoints < 0 || awardedPoints > 500) {
+      return res.status(400).json({ success: false, message: 'Status atau poin review tidak valid.' });
+    }
+
+    const pool = getPool();
+    const [rows] = await pool.query<any[]>(
+      `SELECT s.id, m.kejuruan_id
+       FROM mission_submissions s
+       JOIN missions m ON m.id = s.mission_id
+       WHERE s.id = ? LIMIT 1`,
+      [req.params.id]
+    );
+    const submission = rows[0];
+    if (!submission) return res.status(404).json({ success: false, message: 'Pengumpulan tugas tidak ditemukan.' });
+    if (req.user?.role === 'mentor' && String(submission.kejuruan_id || '') !== String(req.user.kejuruanId || '')) {
+      return res.status(403).json({ success: false, message: 'Review hanya dapat dilakukan untuk tugas pada kejuruan Anda.' });
+    }
+
+    await pool.query(
+      `UPDATE mission_submissions
+       SET status = ?, points = ?, reviewed_by = ?, reviewed_at = NOW(), feedback = ?
+       WHERE id = ?`,
+      [status, awardedPoints, String(req.user?.name || 'Mentor').slice(0, 64), String(feedback || '').trim(), req.params.id]
+    );
+    return res.json({ success: true, message: 'Review tugas berhasil disimpan ke TiDB.' });
+  } catch (error: any) {
+    console.error('[Mission Review Error]', error);
+    return res.status(500).json({ success: false, message: 'Review tugas gagal disimpan ke TiDB.' });
+  }
+});
+
 // Leave requests: the attachment is a share URL stored as text in TiDB.
 const mapLeaveRequest = (row: any) => ({
   id: row.id,

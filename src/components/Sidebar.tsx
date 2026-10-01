@@ -157,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'presensi', label: 'Verifikasi Peserta', icon: CalendarCheck, badge: pendingTraineeVerifications },
         { id: 'laporan-harian', label: 'Laporan Harian', icon: BookOpen, badge: pendingDailyReportsCount },
         { id: 'misi', label: 'Misi Kejuruan', icon: Target, badge: pendingMissionsCount },
-        { id: 'hall-of-fame', label: 'Hall of Fame', icon: Trophy },
+        { id: 'hall-of-fame', label: 'Hall of Fame Peserta', icon: Trophy },
         { id: 'rekap', label: 'Rekap Bulanan', icon: FileSpreadsheet },
         { id: 'izin', label: 'Verifikasi Izin', icon: FileText, badge: pendingLeavesCount },
         { id: 'profil', label: 'Profil Saya', icon: UserRound }
