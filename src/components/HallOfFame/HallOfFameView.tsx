@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MobileHeaderStatus } from '../MobileHeaderStatus';
-import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
 import { User, MissionSubmission, TraineeHallOfFameEntry } from '../../types';
 import { api } from '../../services/api';
 import {
@@ -10,8 +9,6 @@ import {
   Award,
   Crown,
   Sparkles,
-  Search,
-  Filter,
   CheckCircle2,
   ChevronRight,
   ExternalLink,
@@ -37,10 +34,8 @@ interface TraineeRanking {
 }
 
 export const HallOfFameView: React.FC = () => {
-  const { users, kejuruanList, missionSubmissions, currentUser, setActiveTab } = useApp();
+  const { users, missionSubmissions, currentUser, setActiveTab } = useApp();
 
-  const [selectedKejuruanFilter, setSelectedKejuruanFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTraineeDetail, setSelectedTraineeDetail] = useState<TraineeRanking | null>(null);
   const [leaderboardTrainees, setLeaderboardTrainees] = useState<TraineeHallOfFameEntry[] | null>(null);
   const [leaderboardStatus, setLeaderboardStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -163,23 +158,6 @@ export const HallOfFameView: React.FC = () => {
     }));
   }, [currentUser.role, leaderboardTrainees, trainees, missionSubmissions]);
 
-  // Filtered rankings
-  const filteredRankings = useMemo(() => {
-    return rankings.filter(r => {
-      if (!matchesKejuruanFilter(selectedKejuruanFilter, kejuruanList, r.user.kejuruanId, r.user.kejuruanName)) {
-        return false;
-      }
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const matchName = r.user.name.toLowerCase().includes(q);
-        const matchNim = r.user.nim.toLowerCase().includes(q);
-        const matchKj = r.user.kejuruanName?.toLowerCase().includes(q);
-        if (!matchName && !matchNim && !matchKj) return false;
-      }
-      return true;
-    });
-  }, [rankings, selectedKejuruanFilter, searchQuery, kejuruanList]);
-
   // Current logged in trainee's standing
   const myRanking = useMemo(() => {
     if (currentUser.role !== 'trainee') return null;
@@ -241,7 +219,7 @@ export const HallOfFameView: React.FC = () => {
       </div>
 
       {/* TOP 3 PODIUM HERO SECTION */}
-      {rankings.length >= 3 && selectedKejuruanFilter === 'all' && !searchQuery && (
+      {rankings.length >= 3 && (
         <div className="bg-[#123B59] rounded-2xl p-6 sm:p-8 relative overflow-hidden">
           {/* Ambient Glow */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 bg-[#4C83B5]/20 blur-3xl pointer-events-none rounded-full" />
@@ -351,37 +329,6 @@ export const HallOfFameView: React.FC = () => {
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="surface flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
-          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
-            <Search className="w-3.5 h-3.5 text-[#A9C7DE] absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Cari nama peserta atau NIM..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[#E4EAF0] bg-[#F4F6F8] text-[#123B59] placeholder-[#A9C7DE] outline-none focus:ring-1 focus:ring-[#4C83B5]"
-            />
-          </div>
-
-          <select
-            value={selectedKejuruanFilter}
-            onChange={e => setSelectedKejuruanFilter(e.target.value)}
-            className="text-xs py-1.5 px-2.5 rounded-lg border border-[#E4EAF0] bg-[#F4F6F8] text-[#123B59] outline-none max-w-xs"
-          >
-            <option value="all">Semua Program Kejuruan</option>
-            {getKejuruanFilterOptions(kejuruanList).map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="text-[11px] text-[#6F7F8D]">
-          Total <strong className="text-[#123B59]">{filteredRankings.length}</strong> peserta pelatihan
-        </div>
-      </div>
-
       {/* RANKINGS TABLE */}
       <div className="surface rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -398,18 +345,18 @@ export const HallOfFameView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E4EAF0]">
-              {filteredRankings.length === 0 ? (
+              {rankings.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-[#6F7F8D]">
                     {currentUser.role === 'trainee' && leaderboardStatus === 'loading'
                       ? 'Memuat peringkat peserta...'
                       : currentUser.role === 'trainee' && leaderboardStatus === 'error'
                         ? 'Peringkat peserta belum dapat dimuat. Coba muat ulang halaman.'
-                        : 'Tidak ditemukan peserta yang sesuai filter.'}
+                        : 'Belum ada peserta untuk ditampilkan.'}
                   </td>
                 </tr>
               ) : (
-                filteredRankings.map(ranking => {
+                rankings.map(ranking => {
                   const isCurrent = currentUser.id === ranking.user.id;
                   const isTop1 = ranking.rank === 1;
                   const isTop2 = ranking.rank === 2;
