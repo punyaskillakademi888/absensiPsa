@@ -288,15 +288,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
 
-        <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono">
-          <span className="flex items-center gap-1.5 text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            TiDB Cloud
-          </span>
-          <span className="px-1.5 py-0.5 rounded bg-white/10 text-[#A9C7DE] text-[9px] font-bold">
-            JWT: {currentUser.role.toUpperCase()}
-          </span>
-        </div>
       </section>
 
       {/* Navigation Menu */}

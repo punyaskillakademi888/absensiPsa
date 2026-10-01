@@ -8,7 +8,6 @@ import {
   AlertCircle,
   ArrowRight,
   Lock,
-  Database,
   Loader2
 } from 'lucide-react';
 
@@ -62,46 +61,16 @@ export const LoginView: React.FC = () => {
           <p className="text-[10px] font-bold tracking-[.16em] text-[#4C83B5] uppercase pt-1">
             PRESENSI MAGANG HARIAN
           </p>
-          <p className="text-xs text-[#6F7F8D]">
-            Sistem Autentikasi JWT 3-Role (Admin &middot; Mentor &middot; Peserta)
-          </p>
-
-          {/* Database & JWT Status Chip */}
-          <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-3 py-1 bg-white rounded-2xl sm:rounded-full border border-[#DCE4EC] text-[11px] shadow-xs">
-            <Database className="w-3.5 h-3.5 text-[#123B59]" />
-            <span className="font-semibold text-[#123B59]">TiDB Cloud</span>
-            <span className={`inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
-              tidbStatus === 'connected'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : tidbStatus === 'connecting'
-                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-rose-50 text-rose-700 border-rose-200'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                tidbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : tidbStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
-              }`}></span>
-              {tidbStatus === 'connected' ? 'Connected' : tidbStatus}
-            </span>
-            <span className="text-[#A9B8C5]">&bull;</span>
-            <span className="font-mono text-[10px] font-bold text-[#4C83B5] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-              JWT Enabled
-            </span>
-          </div>
         </div>
 
         {tidbStatus === 'offline' && (
           <div className="p-3.5 rounded-xl border border-[#E3C4D0] bg-[#FCF3F6] text-xs text-[#B84469] font-medium">
-            Backend belum terhubung. Buka <span className="font-mono">/api/health</span> pada domain Vercel ini, lalu pastikan environment JWT_SECRET dan TiDB sudah diisi lalu Redeploy.
+            Layanan login sedang tidak tersedia. Silakan coba lagi beberapa saat.
           </div>
         )}
 
         {/* Surface Card Box */}
         <div className="surface rounded-2xl p-6 sm:p-7 shadow-xl space-y-5 bg-white border border-[#E4EAF0]">
-          <div className="flex items-center gap-2 text-xs text-[#6F7F8D]">
-            <KeyRound className="w-4 h-4 text-[#4C83B5]" />
-            <span>Masuk dengan kode akun atau NIM. Role diverifikasi otomatis.</span>
-          </div>
-
           {/* Error Notification */}
           {errorMessage && (
             <div className="p-3.5 rounded-xl border border-[#E3C4D0] bg-[#FCF3F6] flex items-start gap-2.5 text-xs text-[#B84469] font-medium">
@@ -114,12 +83,9 @@ export const LoginView: React.FC = () => {
           {
             <form onSubmit={handleCodeSubmit} className="space-y-4 text-xs">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="font-bold text-[#123B59]">
-                    Kode Login 8 Digit atau NIM
-                  </label>
-                  <span className="text-[10px] text-[#6F7F8D]">Semua role</span>
-                </div>
+                <label className="block font-bold text-[#123B59] mb-1.5">
+                  Kode Login 8 Digit atau NIM
+                </label>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-[#6F7F8D] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -132,9 +98,6 @@ export const LoginView: React.FC = () => {
                     autoFocus
                   />
                 </div>
-                <p className="text-[11px] text-[#6F7F8D] mt-1">
-                  Diverifikasi via database TiDB &amp; token JWT otomatis diterbitkan.
-                </p>
               </div>
 
               <div>
@@ -168,7 +131,7 @@ export const LoginView: React.FC = () => {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Memverifikasi TiDB &amp; JWT...</span>
+                    <span>Memverifikasi akun...</span>
                   </>
                 ) : (
                   <>
@@ -185,9 +148,6 @@ export const LoginView: React.FC = () => {
         <div className="text-center text-xs text-[#6F7F8D] space-y-1">
           <p className="font-medium text-[#123B59]">
             Presensi Magang Harian &middot; Punya Skill Akademi 2026
-          </p>
-          <p className="text-[11px] text-[#8C9AA8]">
-            Database: TiDB AWS Cloud ap-southeast-1 &middot; JWT HMAC-SHA256
           </p>
         </div>
       </div>

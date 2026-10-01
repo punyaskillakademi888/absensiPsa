@@ -109,6 +109,7 @@ export const MissionManagementView: React.FC = () => {
   );
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [expandedMissionDescriptionId, setExpandedMissionDescriptionId] = useState<string | null>(null);
 
   // Modal states for creating / editing mission (Mentor / Admin)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -614,9 +615,24 @@ export const MissionManagementView: React.FC = () => {
                     </h3>
 
                     {/* Mission Description */}
-                    <p className="text-xs text-[#6F7F8D] mt-2 line-clamp-3 leading-relaxed">
+                    <p
+                      id={`mission-description-${mission.id}`}
+                      className={`text-xs text-[#6F7F8D] mt-2 leading-relaxed break-words ${expandedMissionDescriptionId === mission.id ? 'whitespace-pre-wrap' : 'line-clamp-3'}`}
+                    >
                       {mission.description}
                     </p>
+                    <button
+                      type="button"
+                      aria-expanded={expandedMissionDescriptionId === mission.id}
+                      aria-controls={`mission-description-${mission.id}`}
+                      onClick={() => setExpandedMissionDescriptionId(currentId =>
+                        currentId === mission.id ? null : mission.id
+                      )}
+                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#4C83B5] hover:text-[#123B59] cursor-pointer"
+                    >
+                      <ChevronRight className={`h-3 w-3 transition-transform ${expandedMissionDescriptionId === mission.id ? 'rotate-90' : ''}`} />
+                      {expandedMissionDescriptionId === mission.id ? 'Ringkas' : 'Lihat selengkapnya'}
+                    </button>
 
                     {/* Guide Info */}
                     {mission.submissionGuide && (

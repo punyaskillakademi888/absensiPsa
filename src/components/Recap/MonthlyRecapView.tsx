@@ -13,7 +13,6 @@ import {
   ChevronDown,
   ChevronUp,
   Calendar,
-  Sparkles,
   UserCheck,
   Trash2
 } from 'lucide-react';
@@ -181,6 +180,7 @@ export const MonthlyRecapView: React.FC = () => {
   };
 
   const selectedDayNumber = selectedDayFilter !== 'summary' && selectedDayFilter !== 'all-days' ? Number(selectedDayFilter) : null;
+  const tableColumnCount = (isTrainee ? 7 : 10) + (selectedDayNumber ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -194,15 +194,10 @@ export const MonthlyRecapView: React.FC = () => {
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-[#123B59]">
               {isTrainee ? 'Rekapitulasi Presensi Saya' : 'Rekapitulasi Presensi Bulanan'}
             </h1>
-            {isTrainee && (
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EAF2F8] text-[#28618F] border border-[#C8DCEB]">
-                Data Pribadi
-              </span>
-            )}
           </div>
           <p className="text-xs text-[#6F7F8D] mt-1">
             {isTrainee
-              ? `Ringkasan kehadiran mandiri · Periode ${recapData.monthName} ${selectedYear} · ${currentUser.name} (${currentUser.nim || '-'})`
+              ? `Ringkasan kehadiran mandiri · Periode ${recapData.monthName} ${selectedYear}`
               : `Ringkasan Statistik Kehadiran Bulanan · Periode ${recapData.monthName} ${selectedYear} (${filteredSummaries.length} Peserta)`}
           </p>
           <MobileHeaderStatus />
@@ -351,11 +346,7 @@ export const MonthlyRecapView: React.FC = () => {
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
             </select>
-          ) : (
-            <div className="text-xs px-3 py-2 rounded-xl bg-[#EAF2F8] border border-[#C8DCEB] text-[#28618F] font-bold">
-              Kejuruan: {currentUser.kejuruanName || '-'}
-            </div>
-          )}
+          ) : null}
 
           {/* DROPDOWN DETAIL TANGGAL */}
           <div className="flex items-center gap-1.5 bg-[#EEF5FA] p-1 px-2.5 rounded-xl border border-[#C8DCEB]">
@@ -394,30 +385,15 @@ export const MonthlyRecapView: React.FC = () => {
         )}
       </div>
 
-      {/* Trainee Privacy Banner */}
-      {isTrainee && (
-        <div className="p-3.5 bg-[#EEF6FB] border border-[#C8DCEB] rounded-2xl flex flex-col items-start gap-2 text-xs text-[#123B59] sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-[#4C83B5] shrink-0" />
-            <span>
-              Menampilkan rekapitulasi kehadiran pribadi Anda (<strong>{currentUser.name}</strong>). Data peserta lain terlindungi privasinya.
-            </span>
-          </div>
-          <span className="font-mono text-[11px] font-bold text-[#28618F] bg-[#EAF2F8] px-2.5 py-1 rounded-full">
-            NIM: {currentUser.nim}
-          </span>
-        </div>
-      )}
-
       {/* Simplified, Clean Stats Table */}
       <div className="surface rounded-2xl border border-[#E4EAF0] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-[#F8FAFB] text-[#6F7F8D] text-[10px] font-bold tracking-wide uppercase border-b border-[#E4EAF0]">
-                <th className="py-3 px-3 w-10 text-center">No</th>
-                <th className="py-3 px-3 min-w-[200px]">{isTrainee ? 'Peserta (Saya)' : 'Nama Peserta'}</th>
-                <th className="py-3 px-3 min-w-[140px]">Kejuruan</th>
+                {!isTrainee && <th className="py-3 px-3 w-10 text-center">No</th>}
+                {!isTrainee && <th className="py-3 px-3 min-w-[200px]">Nama Peserta</th>}
+                {!isTrainee && <th className="py-3 px-3 min-w-[140px]">Kejuruan</th>}
                 <th className="py-3 px-3 text-center text-[#28618F] font-bold w-16">Hadir</th>
                 <th className="py-3 px-3 text-center text-[#C05621] font-bold w-16">Telat</th>
                 <th className="py-3 px-3 text-center text-[#4C83B5] font-bold w-16">Izin</th>
@@ -435,7 +411,7 @@ export const MonthlyRecapView: React.FC = () => {
             <tbody className="divide-y divide-[#E4EAF0]">
               {filteredSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-[#6F7F8D] italic">
+                  <td colSpan={tableColumnCount} className="py-8 text-center text-[#6F7F8D] italic">
                     Tidak ada data peserta yang cocok dengan filter pencarian.
                   </td>
                 </tr>
@@ -447,20 +423,20 @@ export const MonthlyRecapView: React.FC = () => {
                   return (
                     <React.Fragment key={item.trainee.id}>
                       <tr className="hover:bg-[#F8FAFB]/60 transition">
-                        <td className="py-3 px-3 text-center text-[#6F7F8D] tabular-nums font-semibold">
-                          {idx + 1}
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-[#123B59]">
-                            {item.trainee.name}
-                          </div>
-                          <div className="text-[10px] text-[#6F7F8D] font-mono">
-                            {item.trainee.nim}
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-[#123B59] font-medium truncate max-w-[160px]">
-                          {item.trainee.kejuruanName || '-'}
-                        </td>
+                        {!isTrainee && (
+                          <>
+                            <td className="py-3 px-3 text-center text-[#6F7F8D] tabular-nums font-semibold">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-[#123B59]">{item.trainee.name}</div>
+                              <div className="text-[10px] text-[#6F7F8D] font-mono">{item.trainee.nim}</div>
+                            </td>
+                            <td className="py-3 px-3 text-[#123B59] font-medium truncate max-w-[160px]">
+                              {item.trainee.kejuruanName || '-'}
+                            </td>
+                          </>
+                        )}
 
                         {/* Hadir */}
                         <td className="py-3 px-3 text-center font-bold text-[#28618F] tabular-nums">
@@ -547,11 +523,12 @@ export const MonthlyRecapView: React.FC = () => {
                       {/* Dropdown Expansion: Detailed Dates Calendar Breakdown */}
                       {isExpanded && (
                         <tr className="bg-[#F8FAFB] border-b border-[#E4EAF0]">
-                          <td colSpan={selectedDayNumber ? 11 : 10} className="p-4 pl-10">
+                          <td colSpan={tableColumnCount} className="p-4 pl-10">
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-[11px] text-[#6F7F8D]">
                                 <span className="font-bold text-[#123B59]">
-                                  Rincian Tanggal {recapData.monthName} {selectedYear} ({item.trainee.name}):
+                                  Rincian Tanggal {recapData.monthName} {selectedYear}
+                                  {!isTrainee && ` (${item.trainee.name})`}:
                                 </span>
                                 <div className="flex items-center gap-3 text-[10px]">
                                   <span className="flex items-center gap-1">
