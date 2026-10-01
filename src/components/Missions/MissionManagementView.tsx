@@ -884,8 +884,8 @@ export const MissionManagementView: React.FC = () => {
       {/* MODAL 1: CREATE / EDIT MISSION (MENTOR / ADMIN) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D2F47]/45 backdrop-blur-sm">
-          <div className="surface rounded-2xl max-w-lg w-full overflow-hidden">
-            <div className="p-4 border-b border-[#E4EAF0] flex items-center justify-between">
+          <div className="surface rounded-2xl max-w-lg w-full max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-[#E4EAF0] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Target className="w-4 h-4 text-[#4C83B5]" />
                 <h3 className="font-bold text-sm text-[#123B59]">
@@ -900,7 +900,7 @@ export const MissionManagementView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveMission} className="p-5 space-y-4">
+            <form onSubmit={handleSaveMission} className="min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
               {isAdmin && <div>
                 <label className="block text-xs font-semibold text-[#123B59] mb-1">
                   Program Kejuruan Target
