@@ -7,14 +7,6 @@ export interface KejuruanFilterOption {
   label: string;
 }
 
-export const HIDDEN_ADMIN_DASHBOARD_PROGRAM_CODES = new Set([
-  'CS-05',
-  'DA-03',
-  'DM-04',
-  'UX-02',
-  'WD-01',
-]);
-
 const legacyKejuruanCodes: Record<string, string> = {
   'IMP-1nl422t': 'SB-04',
   'IMP-1t5ojqc': 'ST-04',

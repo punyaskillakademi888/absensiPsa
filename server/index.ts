@@ -1030,15 +1030,9 @@ const mapMission = (row: any) => ({
   submissionGuide: row.submission_guide || undefined,
 });
 
-const mentorCanManageProgram = (req: AuthenticatedRequest, kejuruanId: string, kejuruanName = '') => {
+const mentorCanManageProgram = (req: AuthenticatedRequest, kejuruanId: string) => {
   if (req.user?.role !== 'mentor') return req.user?.role === 'admin';
-  const mentorName = (req.user.name || '').toLowerCase();
-  const programName = kejuruanName.toLowerCase();
-  if (mentorName.includes('dzikri')) return programName === 'smart creative' || programName.includes('generative ai') || programName.includes('konten visual untuk sosial media') || programName.includes('optimalisasi pemasaran melalui media sosial');
-  if (mentorName.includes('ayu') || mentorName.includes('vanesha')) return programName.includes('sistem informasi pariwisata');
-  if (mentorName.includes('fadil')) return programName.includes('node.js') || programName.includes('react');
-  if (mentorName.includes('davy')) return programName.includes('integrasi bangunan cerdas');
-  return req.user.kejuruanId === kejuruanId;
+  return String(req.user.kejuruanId || '') === String(kejuruanId);
 };
 
 app.get('/api/missions', authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -1064,7 +1058,7 @@ app.post('/api/missions', authenticateToken, authorizeRoles('mentor'), async (re
     if (!mission?.id || !mission?.title?.trim() || !mission?.description?.trim() || !mission?.kejuruanId || !mission?.kejuruanName) {
       return res.status(400).json({ success: false, message: 'Data misi belum lengkap.' });
     }
-    if (!mentorCanManageProgram(req, mission.kejuruanId, mission.kejuruanName)) {
+    if (!mentorCanManageProgram(req, mission.kejuruanId)) {
       return res.status(403).json({ success: false, message: 'Mentor hanya dapat membuat misi untuk kejuruan yang ditugaskan.' });
     }
 
@@ -1090,13 +1084,13 @@ app.put('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), async 
     const [rows] = await pool.query<any[]>('SELECT * FROM missions WHERE id = ? LIMIT 1', [req.params.id]);
     const existing = rows[0];
     if (!existing) return res.status(404).json({ success: false, message: 'Misi tidak ditemukan.' });
-    if (req.user?.role === 'mentor' && (existing.mentor_id !== req.user.id || !mentorCanManageProgram(req, existing.kejuruan_id, existing.kejuruan_name))) {
+    if (req.user?.role === 'mentor' && existing.mentor_id !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Anda tidak dapat mengubah misi ini.' });
     }
 
     const updates = req.body || {};
     const targetKejuruanId = updates.kejuruanId || existing.kejuruan_id;
-    if (!mentorCanManageProgram(req, targetKejuruanId, updates.kejuruanName || existing.kejuruan_name)) {
+    if (!mentorCanManageProgram(req, targetKejuruanId)) {
       return res.status(403).json({ success: false, message: 'Mentor hanya dapat membuat misi untuk kejuruan yang ditugaskan.' });
     }
     await pool.query(
@@ -1121,7 +1115,7 @@ app.delete('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), asy
     const mission = rows[0];
     // DELETE is idempotent; a retry after a successful delete stays successful.
     if (!mission) return res.json({ success: true, message: 'Misi sudah dihapus.' });
-    if (mission.mentor_id !== req.user?.id || !mentorCanManageProgram(req, mission.kejuruan_id, mission.kejuruan_name)) {
+    if (mission.mentor_id !== req.user?.id) {
       return res.status(403).json({ success: false, message: 'Anda tidak dapat menghapus misi ini.' });
     }
     await pool.query('DELETE FROM missions WHERE id = ?', [req.params.id]);

@@ -53,26 +53,8 @@ const mapReport = (r: any) => ({
   reviewedAt: dateTimeText(r.reviewed_at), reviewNotes: r.review_notes || undefined,
 });
 
-const assignedProgramNames = (user: { name: string; kejuruanName?: string | null }) => {
-  const names = new Set<string>();
-  if (user.kejuruanName?.trim()) names.add(user.kejuruanName.trim().toLowerCase());
-
-  const mentorName = user.name.toLowerCase();
-  if (mentorName.includes('dzikri')) {
-    [
-      'Pengoperasian Tools Generative AI untuk Konten Digital dan Bisnis',
-      'Pembuatan Konten Visual untuk Sosial Media',
-      'Optimalisasi Pemasaran Melalui Media Sosial',
-    ].forEach(name => names.add(name.toLowerCase()));
-  } else if (mentorName.includes('ayu') || mentorName.includes('vanesha')) {
-    names.add('Pembuatan Sistem Informasi Pariwisata Berbasis Website'.toLowerCase());
-  } else if (mentorName.includes('fadil')) {
-    names.add('Pengembangan Web dengan Node.js dan React'.toLowerCase());
-  } else if (mentorName.includes('davy')) {
-    names.add('Pemasangan Sistem Integrasi Bangunan Cerdas'.toLowerCase());
-  }
-  return [...names];
-};
+const assignedProgramNames = (user: { kejuruanName?: string | null }) =>
+  user.kejuruanName?.trim() ? [user.kejuruanName.trim().toLowerCase()] : [];
 
 const normalizedNameClause = (column: string, names: string[]) => names.length
   ? `LOWER(TRIM(${column})) IN (${names.map(() => '?').join(',')})`

@@ -16,7 +16,7 @@ import {
 import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB } from '../../utils/dateUtils';
 import { AttendanceStatus } from '../../types';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
-import { getKejuruanFilterOptions, HIDDEN_ADMIN_DASHBOARD_PROGRAM_CODES, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
+import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -148,9 +148,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Kejuruan statistics for trainees
   const kejuruanStats = useMemo(() => {
-    const stats = kejuruanList.filter(kj =>
-      !HIDDEN_ADMIN_DASHBOARD_PROGRAM_CODES.has(kj.code.trim().toUpperCase())
-    ).map(kj => {
+    const stats = kejuruanList.map(kj => {
       const normalizedProgramName = kj.name.trim().toLocaleLowerCase();
       const kjTrainees = trainees.filter(t =>
         t.kejuruanId === kj.id || t.kejuruanName?.trim().toLocaleLowerCase() === normalizedProgramName
@@ -683,9 +681,7 @@ export const AdminDashboard: React.FC = () => {
                   {kejuruanList.filter(kj => kj.category === 'Smart Creative').map(kj => (
                     <option key={`${kj.id}-group`} value={kj.id}>SC-04 - Semua Smart Creative</option>
                   ))}
-                  {getKejuruanFilterOptions(kejuruanList.filter(kj =>
-                    !HIDDEN_ADMIN_DASHBOARD_PROGRAM_CODES.has(kj.code.trim().toUpperCase())
-                  )).map(option => (
+                  {getKejuruanFilterOptions(kejuruanList).map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
