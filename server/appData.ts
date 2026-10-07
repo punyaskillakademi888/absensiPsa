@@ -589,7 +589,7 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
     for (const r of lists.dailyReports) {
       if (user.role === 'trainee' && !own(r)) continue;
       const reviewUpdate = user.role === 'trainee'
-        ? 'description=VALUES(description),photo_url=VALUES(photo_url),photo_name=VALUES(photo_name),submission_link=VALUES(submission_link),submitted_at=VALUES(submitted_at)'
+        ? 'description=VALUES(description),photo_url=VALUES(photo_url),photo_name=VALUES(photo_name),submission_link=VALUES(submission_link),status=VALUES(status),submitted_at=VALUES(submitted_at),reviewed_by=VALUES(reviewed_by),reviewed_at=VALUES(reviewed_at),review_notes=VALUES(review_notes)'
         : 'description=VALUES(description),photo_url=VALUES(photo_url),photo_name=VALUES(photo_name),submission_link=VALUES(submission_link),status=VALUES(status),reviewed_by=VALUES(reviewed_by),reviewed_at=VALUES(reviewed_at),review_notes=VALUES(review_notes)';
       await upsert(`INSERT INTO daily_reports (id,trainee_id,trainee_name,trainee_nim,trainee_avatar,kejuruan_id,kejuruan_name,report_date,description,photo_url,photo_name,submission_link,status,submitted_at,reviewed_by,reviewed_at,review_notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ${reviewUpdate}`,
       [r.id,r.traineeId,r.traineeName,r.traineeNim,r.traineeAvatar || null,r.kejuruanId || null,r.kejuruanName || null,dateValue(r.date),r.description,r.photoUrl || null,r.photoName || null,r.submissionLink || null,user.role === 'trainee' ? 'pending' : r.status,dateTimeValue(r.submittedAt),user.role === 'trainee' ? null : r.reviewedBy || null,user.role === 'trainee' ? null : dateTimeValue(r.reviewedAt),user.role === 'trainee' ? null : r.reviewNotes || null]);

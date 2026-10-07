@@ -89,7 +89,7 @@ interface AppContextType {
     photoUrl?: string;
     photoName?: string;
     submissionLink?: string;
-  }) => { success: boolean; message: string };
+  }) => Promise<{ success: boolean; message: string }>;
   reviewDailyReport: (
     reportId: string,
     status: 'approved' | 'rejected',
@@ -1130,37 +1130,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Daily Report: submit (trainee) — 1 per day per user
-  const submitDailyReport = (data: {
+  const submitDailyReport = async (data: {
     date: string;
     description: string;
     photoUrl?: string;
     photoName?: string;
     submissionLink?: string;
-  }): { success: boolean; message: string } => {
+  }): Promise<{ success: boolean; message: string }> => {
     const existing = dailyReports.find(
       r => r.traineeId === currentUser.id && r.date === data.date
     );
     if (existing) {
       if (existing.status === 'rejected') {
-        setDailyReports(prev =>
-          prev.map(r =>
-            r.id === existing.id
-              ? {
-                  ...r,
-                  description: data.description,
-                  photoUrl: data.photoUrl,
-                  photoName: data.photoName,
-                  submissionLink: data.submissionLink,
-                  status: 'pending',
-                  submittedAt: new Date().toISOString(),
-                  reviewedBy: undefined,
-                  reviewedAt: undefined,
-                  reviewNotes: undefined
-                }
-              : r
-          )
+        const updatedReports: DailyReport[] = dailyReports.map(r =>
+          r.id === existing.id
+            ? {
+                ...r,
+                description: data.description,
+                photoUrl: data.photoUrl,
+                photoName: data.photoName,
+                submissionLink: data.submissionLink,
+                status: 'pending' as const,
+                submittedAt: new Date().toISOString(),
+                reviewedBy: undefined,
+                reviewedAt: undefined,
+                reviewNotes: undefined
+              }
+            : r
         );
-        return { success: true, message: 'Laporan harian berhasil diperbarui dan dikembalikan ke mentor.' };
+        setDailyReports(updatedReports);
+        // Save immediately to prevent data loss on refresh before autosave
+        if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
+        try {
+          await api.saveAppData({
+            kejuruanList: currentUser.role === 'admin' ? kejuruanList : [],
+            attendanceRecords,
+            leaveRequests,
+            settings: null,
+            missions: [],
+            missionSubmissions: [],
+            dailyReports: updatedReports,
+          });
+          return { success: true, message: 'Laporan harian berhasil diperbarui dan dikembalikan ke mentor.' };
+        } catch (error: any) {
+          console.error('[TiDB] Gagal menyimpan revisi laporan harian:', error);
+          return { success: false, message: error.message || 'Gagal menyimpan revisi laporan harian.' };
+        }
       }
       return { success: false, message: 'Kamu sudah mengumpulkan laporan untuk tanggal ini.' };
     }
@@ -1181,8 +1196,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'pending',
       submittedAt: new Date().toISOString()
     };
-    setDailyReports(prev => [...prev, newReport]);
-    return { success: true, message: 'Laporan harian berhasil dikirim ke mentor!' };
+    const newReports: DailyReport[] = [...dailyReports, newReport];
+    setDailyReports(newReports);
+    // Save immediately to prevent data loss on refresh before autosave
+    if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
+    try {
+      await api.saveAppData({
+        kejuruanList: currentUser.role === 'admin' ? kejuruanList : [],
+        attendanceRecords,
+        leaveRequests,
+        settings: null,
+        missions: [],
+        missionSubmissions: [],
+        dailyReports: newReports,
+      });
+      return { success: true, message: 'Laporan harian berhasil dikirim ke mentor!' };
+    } catch (error: any) {
+      console.error('[TiDB] Gagal menyimpan laporan harian baru:', error);
+      return { success: false, message: error.message || 'Gagal menyimpan laporan harian baru.' };
+    }
   };
 
   // Daily Report: review (mentor / admin)

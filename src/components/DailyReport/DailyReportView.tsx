@@ -118,13 +118,13 @@ export const DailyReportView: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formDesc.trim()) {
       setFormError('Deskripsi kegiatan wajib diisi.');
       return;
     }
-    const res = submitDailyReport({
+    const res = await submitDailyReport({
       date: formDate,
       description: formDesc.trim(),
       photoUrl: formPhotoUrl,
