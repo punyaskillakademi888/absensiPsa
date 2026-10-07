@@ -1279,7 +1279,7 @@ export const MissionManagementView: React.FC = () => {
                     className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{isReviewSaving ? 'Menyimpan...' : 'Setujui dan Beri Poin'}</span>
+                    <span>{isReviewSaving ? 'Menyimpan...' : 'Setujui & Beri Poin'}</span>
                   </button>
                 </div>
               </div>
