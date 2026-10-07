@@ -17,7 +17,9 @@ import {
   MessageSquare,
   ImageIcon,
   Send,
-  ExternalLink
+  ExternalLink,
+  Pencil,
+  RefreshCw
 } from 'lucide-react';
 import { getTodayDateString, INDONESIAN_MONTHS } from '../../utils/dateUtils';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
@@ -68,7 +70,31 @@ export const DailyReportView: React.FC = () => {
   const [formSubmissionLink, setFormSubmissionLink] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEditReport = (report: DailyReport) => {
+    setEditingReport(report);
+    setFormDate(report.date);
+    setFormDesc(report.description);
+    setFormPhotoUrl(report.photoUrl);
+    setFormPhotoName(report.photoName || (report.photoUrl ? 'Foto sebelumnya' : undefined));
+    setFormSubmissionLink(report.submissionLink || '');
+    setFormError(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingReport(null);
+    setFormDate(today);
+    setFormDesc('');
+    setFormPhotoUrl(undefined);
+    setFormPhotoName(undefined);
+    setFormSubmissionLink('');
+    setFormError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const myReportForDate = useMemo(
     () => dailyReports.find(r => r.traineeId === currentUser.id && r.date === formDate),
@@ -124,6 +150,11 @@ export const DailyReportView: React.FC = () => {
       setFormError('Deskripsi kegiatan wajib diisi.');
       return;
     }
+    if (!formPhotoUrl) {
+      setFormError('Foto laporan wajib diunggah.');
+      return;
+    }
+    setIsSubmitting(true);
     const res = await submitDailyReport({
       date: formDate,
       description: formDesc.trim(),
@@ -131,8 +162,11 @@ export const DailyReportView: React.FC = () => {
       photoName: formPhotoName,
       submissionLink: formSubmissionLink.trim() || undefined
     });
+    setIsSubmitting(false);
     if (res.success) {
       showToast(res.message);
+      setEditingReport(null);
+      setFormDate(today);
       setFormDesc('');
       setFormPhotoUrl(undefined);
       setFormPhotoName(undefined);
@@ -255,12 +289,32 @@ export const DailyReportView: React.FC = () => {
               <div className="px-5 py-4 border-b border-[#E4EAF0]">
                 <div className="flex items-center gap-2">
                   <Upload className="w-4 h-4 text-[#4C83B5]" />
-                  <h2 className="text-sm font-bold text-[#123B59]">Kirim Laporan Harian</h2>
+                  <h2 className="text-sm font-bold text-[#123B59]">{editingReport ? 'Revisi Laporan Harian' : 'Kirim Laporan Harian'}</h2>
                 </div>
                 <p className="text-xs text-[#6F7F8D] mt-0.5">1 laporan per hari · foto wajib</p>
               </div>
 
               <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                {/* Editing mode banner */}
+                {editingReport && (
+                  <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs flex items-start gap-2">
+                    <RefreshCw className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-amber-700">Mode Revisi — Laporan tanggal {formatDateID(editingReport.date)}</p>
+                      {editingReport.reviewNotes && (
+                        <p className="mt-0.5 italic text-amber-600">Catatan mentor: "{editingReport.reviewNotes}"</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="shrink-0 text-[10px] font-semibold text-amber-700 hover:text-amber-900 underline cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
+
                 {/* Date picker */}
                 <div>
                   <label className="block text-xs font-semibold text-[#123B59] mb-1">
@@ -270,8 +324,9 @@ export const DailyReportView: React.FC = () => {
                     type="date"
                     value={formDate}
                     max={today}
+                    disabled={!!editingReport}
                     onChange={e => { setFormDate(e.target.value); setFormError(null); }}
-                    className="w-full text-xs p-2.5 rounded-lg border border-[#E4EAF0] bg-white text-[#123B59] outline-none focus:ring-1 focus:ring-[#4C83B5]"
+                    className="w-full text-xs p-2.5 rounded-lg border border-[#E4EAF0] bg-white text-[#123B59] outline-none focus:ring-1 focus:ring-[#4C83B5] disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -292,9 +347,18 @@ export const DailyReportView: React.FC = () => {
                       {myReportForDate.status === 'pending' && <p className="font-semibold">Laporan tanggal ini sedang menunggu review mentor.</p>}
                       {myReportForDate.status === 'rejected' && (
                         <>
-                          <p className="font-semibold">Laporan dikembalikan. Kamu bisa mengirim ulang.</p>
+                          <p className="font-semibold">Laporan dikembalikan untuk direvisi.</p>
                           {myReportForDate.reviewNotes && (
                             <p className="mt-0.5 italic">Catatan mentor: "{myReportForDate.reviewNotes}"</p>
+                          )}
+                          {!editingReport && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditReport(myReportForDate)}
+                              className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#B84469] text-white text-[11px] font-semibold hover:bg-[#9E3555] transition cursor-pointer"
+                            >
+                              <Pencil className="w-3 h-3" /> Muat Data untuk Direvisi
+                            </button>
                           )}
                         </>
                       )}
@@ -390,11 +454,13 @@ export const DailyReportView: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={myReportForDate?.status === 'approved' || myReportForDate?.status === 'pending'}
+                  disabled={isSubmitting || myReportForDate?.status === 'approved' || myReportForDate?.status === 'pending'}
                   className="w-full py-2.5 rounded-xl bg-[#123B59] hover:bg-[#0D2F47] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  {myReportForDate?.status === 'rejected'
+                  {isSubmitting
+                    ? 'Menyimpan...'
+                    : myReportForDate?.status === 'rejected'
                     ? 'Kirim Ulang Laporan'
                     : myReportForDate?.status === 'pending'
                     ? 'Sedang Ditinjau Mentor'
@@ -445,6 +511,15 @@ export const DailyReportView: React.FC = () => {
                         <div className="mt-2 p-2 rounded-lg bg-[#F4F6F8] border border-[#E4EAF0] text-[10px] text-[#6F7F8D] italic">
                           Catatan mentor: "{report.reviewNotes}"
                         </div>
+                      )}
+                      {report.status === 'rejected' && (
+                        <button
+                          type="button"
+                          onClick={() => handleEditReport(report)}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D95B83] bg-[#FCF3F6] text-xs font-semibold text-[#B84469] hover:bg-[#D95B83] hover:text-white transition cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Revisi & Kirim Ulang
+                        </button>
                       )}
                     </div>
                   ))

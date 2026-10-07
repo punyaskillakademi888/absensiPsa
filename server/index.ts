@@ -18,7 +18,7 @@ import {
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5010;
+const PORT = process.env.PORT || 5000;
 const AUTH_COOKIE = 'hadirku_auth';
 const AUTH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const isVercelRuntime = process.env.VERCEL === '1';
