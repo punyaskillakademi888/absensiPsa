@@ -94,7 +94,7 @@ interface AppContextType {
     reportId: string,
     status: 'approved' | 'rejected',
     reviewNotes?: string
-  ) => void;
+  ) => Promise<{ success: boolean; message: string }>;
   // Attendance management & hierarchical verification
   verifyAttendance: (recordId: string, status: 'verified' | 'rejected', reason?: string) => void;
   markAttendanceStatus: (
@@ -1188,13 +1188,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Daily Report: review (mentor / admin)
-  const reviewDailyReport = (
+  const reviewDailyReport = async (
     reportId: string,
     status: 'approved' | 'rejected',
     reviewNotes?: string
-  ) => {
-    setDailyReports(prev =>
-      prev.map(r =>
+  ): Promise<{ success: boolean; message: string }> => {
+    const updatedReports = dailyReports.map(r =>
         r.id === reportId
           ? {
               ...r,
@@ -1204,8 +1203,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               reviewNotes: reviewNotes || ''
             }
           : r
-      )
     );
+    setDailyReports(updatedReports);
+    if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
+    try {
+      const result = await api.saveAppData({
+        kejuruanList: currentUser.role === 'admin' ? kejuruanList : [],
+        attendanceRecords,
+        leaveRequests,
+        settings: null,
+        missions: [],
+        missionSubmissions,
+        dailyReports: updatedReports,
+      });
+      return result;
+    } catch (error: any) {
+      console.error('[TiDB] Gagal menyimpan verifikasi laporan:', error);
+      return { success: false, message: error.message || 'Verifikasi laporan gagal disimpan.' };
+    }
   };
 
   const resetToDefaultData = () => {

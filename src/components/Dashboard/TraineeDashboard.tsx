@@ -68,7 +68,18 @@ export const TraineeDashboard: React.FC = () => {
   );
 
   const myRecords = useMemo(() => {
-    return attendanceRecords.filter(r => r.userId === currentUser.id);
+    return attendanceRecords
+      .filter(r => r.userId === currentUser.id)
+      .sort((a, b) => {
+        // Compare normalized calendar days so both YYYY-MM-DD and SQL/ISO
+        // datetime values keep the same newest-first order.
+        const dateA = Date.parse(`${String(a.date).slice(0, 10)}T00:00:00Z`);
+        const dateB = Date.parse(`${String(b.date).slice(0, 10)}T00:00:00Z`);
+        const dayDifference = dateB - dateA;
+        if (Number.isFinite(dayDifference) && dayDifference !== 0) return dayDifference;
+        if (a.date !== b.date) return String(b.date).localeCompare(String(a.date));
+        return (b.checkInTime || '').localeCompare(a.checkInTime || '');
+      });
   }, [attendanceRecords, currentUser.id]);
 
   const monthlyStats = useMemo(() => {

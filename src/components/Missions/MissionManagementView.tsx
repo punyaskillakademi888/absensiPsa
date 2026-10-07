@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { MobileHeaderStatus } from '../MobileHeaderStatus';
 import { Mission, MissionDifficulty, MissionSubmission } from '../../types';
@@ -110,6 +111,7 @@ export const MissionManagementView: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedMissionDescriptionId, setExpandedMissionDescriptionId] = useState<string | null>(null);
+  const [expandedSubmissionGuideId, setExpandedSubmissionGuideId] = useState<string | null>(null);
 
   // Modal states for creating / editing mission (Mentor / Admin)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -648,7 +650,17 @@ export const MissionManagementView: React.FC = () => {
                         <span className="font-semibold text-[#123B59] block mb-0.5">
                           Ketentuan Pengumpulan:
                         </span>
-                        <span className="line-clamp-2">{mission.submissionGuide}</span>
+                        <span className={expandedSubmissionGuideId === mission.id ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'}>{mission.submissionGuide}</span>
+                        {mission.submissionGuide.length > 90 && (
+                          <button
+                            type="button"
+                            aria-expanded={expandedSubmissionGuideId === mission.id}
+                            onClick={() => setExpandedSubmissionGuideId(currentId => currentId === mission.id ? null : mission.id)}
+                            className="mt-1 font-semibold text-[#4C83B5] hover:text-[#123B59] cursor-pointer"
+                          >
+                            {expandedSubmissionGuideId === mission.id ? 'Ringkas' : 'Lihat selengkapnya'}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -890,10 +902,10 @@ export const MissionManagementView: React.FC = () => {
       )}
 
       {/* MODAL 1: CREATE / EDIT MISSION (MENTOR / ADMIN) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0D2F47]/45 backdrop-blur-sm">
-          <div className="surface rounded-2xl max-w-lg w-full h-[calc(100dvh-2rem)] sm:h-auto max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-[#E4EAF0] flex items-center justify-between shrink-0">
+      {isModalOpen && createPortal((
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-[#0D2F47]/45 backdrop-blur-sm">
+          <div className="surface my-auto w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] rounded-2xl flex flex-col overflow-y-auto overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="sticky top-0 z-10 p-4 border-b border-[#E4EAF0] bg-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Target className="w-4 h-4 text-[#4C83B5]" />
                 <h3 className="font-bold text-sm text-[#123B59]">
@@ -908,8 +920,8 @@ export const MissionManagementView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveMission} className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-5 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <form onSubmit={handleSaveMission} className="flex flex-col">
+              <div className="p-4 sm:p-5 space-y-4">
               {isAdmin && <div>
                 <label className="block text-xs font-semibold text-[#123B59] mb-1">
                   Program Kejuruan Target
@@ -957,7 +969,7 @@ export const MissionManagementView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#123B59] mb-1">
                     Reward Poin <span className="text-[#D95B83]">*</span>
@@ -1043,7 +1055,7 @@ export const MissionManagementView: React.FC = () => {
               </div>
 
               </div>
-              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[#E4EAF0] bg-white px-5 py-3">
+              <div className="sticky bottom-0 flex shrink-0 items-center justify-end gap-2 border-t border-[#E4EAF0] bg-white px-4 sm:px-5 py-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -1061,7 +1073,7 @@ export const MissionManagementView: React.FC = () => {
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* MODAL 2: SUBMIT WORK (TRAINEE) */}
       {isSubmitModalOpen && targetMissionForSubmit && (

@@ -185,9 +185,17 @@ export const DailyReportView: React.FC = () => {
     setReviewNotes(report.reviewNotes || '');
   };
 
-  const handleConfirmReview = (status: 'approved' | 'rejected') => {
+  const [isSavingReview, setIsSavingReview] = useState(false);
+
+  const handleConfirmReview = async (status: 'approved' | 'rejected') => {
     if (!selectedReport) return;
-    reviewDailyReport(selectedReport.id, status, reviewNotes.trim());
+    setIsSavingReview(true);
+    const result = await reviewDailyReport(selectedReport.id, status, reviewNotes.trim());
+    setIsSavingReview(false);
+    if (!result.success) {
+      showToast(result.message);
+      return;
+    }
     showToast(
       status === 'approved'
         ? `Laporan ${selectedReport.traineeName} tanggal ${formatDateID(selectedReport.date)} disetujui.`
@@ -733,7 +741,8 @@ export const DailyReportView: React.FC = () => {
               <div className="flex flex-col-reverse gap-2 border-t border-[#E4EAF0] pt-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
                   type="button"
-                  onClick={() => handleConfirmReview('rejected')}
+                  onClick={() => void handleConfirmReview('rejected')}
+                  disabled={isSavingReview}
                   className="w-full px-3.5 py-2 rounded-lg bg-[#FCF3F6] hover:bg-[#D95B83] hover:text-white text-[#B84469] text-xs font-semibold transition cursor-pointer sm:w-auto"
                 >
                   Kembalikan / Minta Revisi
@@ -748,7 +757,8 @@ export const DailyReportView: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleConfirmReview('approved')}
+                    onClick={() => void handleConfirmReview('approved')}
+                    disabled={isSavingReview}
                     className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
