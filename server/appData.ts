@@ -575,13 +575,15 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
     // Mission CRUD uses the dedicated /api/missions endpoints. Never upsert
     // missions from this whole-app snapshot: another tab may hold stale data.
 
-    for (const r of lists.missionSubmissions) {
-      if (user.role === 'trainee' && !own(r)) continue;
-      const reviewUpdate = user.role === 'trainee'
-        ? 'submission_link=VALUES(submission_link),notes=VALUES(notes),submitted_at=VALUES(submitted_at)'
-        : 'mission_title=VALUES(mission_title),submission_link=VALUES(submission_link),notes=VALUES(notes),points=VALUES(points),status=VALUES(status),reviewed_by=VALUES(reviewed_by),reviewed_at=VALUES(reviewed_at),feedback=VALUES(feedback)';
-      await upsert(`INSERT INTO mission_submissions (id,mission_id,mission_title,trainee_id,trainee_name,trainee_nim,trainee_avatar,kejuruan_id,kejuruan_name,submission_link,notes,points,submitted_at,status,reviewed_by,reviewed_at,feedback) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ${reviewUpdate}`,
-      [r.id,r.missionId,r.missionTitle,r.traineeId,r.traineeName,r.traineeNim,r.traineeAvatar || null,r.kejuruanId || null,r.kejuruanName || null,r.submissionLink || null,r.notes || '',r.points,dateTimeValue(r.submittedAt),user.role === 'trainee' ? 'pending' : r.status,user.role === 'trainee' ? null : r.reviewedBy || null,user.role === 'trainee' ? null : dateTimeValue(r.reviewedAt),user.role === 'trainee' ? null : r.feedback || null]);
+    if (user.role === 'trainee') {
+      for (const r of lists.missionSubmissions) {
+        if (!own(r)) continue;
+        // Reviews are authoritative only through the dedicated review endpoint.
+        await upsert(
+          `INSERT INTO mission_submissions (id,mission_id,mission_title,trainee_id,trainee_name,trainee_nim,trainee_avatar,kejuruan_id,kejuruan_name,submission_link,notes,points,submitted_at,status,reviewed_by,reviewed_at,feedback) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE mission_title=VALUES(mission_title),submission_link=VALUES(submission_link),notes=VALUES(notes),submitted_at=VALUES(submitted_at)`,
+          [r.id,r.missionId,r.missionTitle,r.traineeId,r.traineeName,r.traineeNim,r.traineeAvatar || null,r.kejuruanId || null,r.kejuruanName || null,r.submissionLink || null,r.notes || '',r.points,dateTimeValue(r.submittedAt),'pending',null,null,null]
+        );
+      }
     }
 
     for (const r of lists.dailyReports) {

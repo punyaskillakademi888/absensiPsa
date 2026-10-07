@@ -336,7 +336,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Missions are written only through /api/missions. A snapshot can be stale
           // and must never recreate a mission after it has been deleted.
           missions: [],
-          missionSubmissions,
+          missionSubmissions: isTrainee ? missionSubmissions : [],
           dailyReports,
         });
         setTidbStatus('connected');
@@ -1213,7 +1213,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         leaveRequests,
         settings: null,
         missions: [],
-        missionSubmissions,
+        missionSubmissions: [],
         dailyReports: updatedReports,
       });
       return result;
