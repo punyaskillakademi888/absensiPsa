@@ -347,8 +347,8 @@ export const api = {
     status: 'approved' | 'rejected';
     feedback: string;
     points: number;
-  }): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>(`/api/missions/submissions/${encodeURIComponent(id)}/review`, {
+  }): Promise<{ success: boolean; message: string; submission: MissionSubmission }> {
+    return this.request<{ success: boolean; message: string; submission: MissionSubmission }>(`/api/missions/submissions/${encodeURIComponent(id)}/review`, {
       method: 'PATCH',
       body: JSON.stringify(review),
     });

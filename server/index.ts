@@ -1154,7 +1154,38 @@ app.patch('/api/missions/submissions/:id/review', authenticateToken, authorizeRo
        WHERE id = ?`,
       [status, awardedPoints, String(req.user?.name || 'Mentor').slice(0, 64), String(feedback || '').trim(), req.params.id]
     );
-    return res.json({ success: true, message: 'Review tugas berhasil disimpan ke TiDB.' });
+    const [savedRows] = await pool.query<any[]>(
+      'SELECT * FROM mission_submissions WHERE id = ? LIMIT 1',
+      [req.params.id]
+    );
+    const saved = savedRows[0];
+    if (!saved) return res.status(500).json({ success: false, message: 'Review tersimpan tetapi hasilnya gagal dibaca ulang.' });
+    const formatDateTime = (value: any) => value instanceof Date
+      ? value.toISOString()
+      : value ? String(value).replace(' ', 'T') : undefined;
+    return res.json({
+      success: true,
+      message: 'Review tugas berhasil disimpan ke TiDB.',
+      submission: {
+        id: saved.id,
+        missionId: saved.mission_id,
+        missionTitle: saved.mission_title,
+        traineeId: saved.trainee_id,
+        traineeName: saved.trainee_name,
+        traineeNim: saved.trainee_nim,
+        traineeAvatar: saved.trainee_avatar || '',
+        kejuruanId: saved.kejuruan_id || '',
+        kejuruanName: saved.kejuruan_name || '',
+        submissionLink: saved.submission_link || undefined,
+        notes: saved.notes || '',
+        points: Number(saved.points),
+        submittedAt: formatDateTime(saved.submitted_at),
+        status: saved.status,
+        reviewedBy: saved.reviewed_by || undefined,
+        reviewedAt: formatDateTime(saved.reviewed_at),
+        feedback: saved.feedback || undefined,
+      },
+    });
   } catch (error: any) {
     console.error('[Mission Review Error]', error);
     return res.status(500).json({ success: false, message: 'Review tugas gagal disimpan ke TiDB.' });

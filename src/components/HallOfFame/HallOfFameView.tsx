@@ -34,7 +34,7 @@ interface TraineeRanking {
 }
 
 export const HallOfFameView: React.FC = () => {
-  const { users, missionSubmissions, currentUser, setActiveTab } = useApp();
+  const { users, missionSubmissions, currentUser, setActiveTab, refreshMissions } = useApp();
 
   const [selectedTraineeDetail, setSelectedTraineeDetail] = useState<TraineeRanking | null>(null);
   const [leaderboardTrainees, setLeaderboardTrainees] = useState<TraineeHallOfFameEntry[] | null>(null);
@@ -48,19 +48,29 @@ export const HallOfFameView: React.FC = () => {
 
     let active = true;
     setLeaderboardStatus('loading');
-    api.getTraineeHallOfFame()
-      .then(result => {
-        if (!active) return;
-        setLeaderboardTrainees(result.trainees);
-        setLeaderboardStatus('loaded');
-      })
-      .catch(error => {
-        console.warn('Could not fetch trainee leaderboard:', error);
-        if (active) setLeaderboardStatus('error');
-      });
+    const refresh = () => {
+      void refreshMissions();
+      api.getTraineeHallOfFame()
+        .then(result => {
+          if (!active) return;
+          setLeaderboardTrainees(result.trainees);
+          setLeaderboardStatus('loaded');
+        })
+        .catch(error => {
+          console.warn('Could not fetch trainee leaderboard:', error);
+          if (active) setLeaderboardStatus('error');
+        });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    const timer = window.setInterval(refresh, 30000);
 
-    return () => { active = false; };
-  }, [currentUser.role]);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+      window.clearInterval(timer);
+    };
+  }, [currentUser.role, refreshMissions]);
 
   // All trainees
   const trainees = useMemo(() => {

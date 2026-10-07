@@ -969,8 +969,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await api.getAppData();
       if (res.success) {
-        setMissions(res.missions);
-        setMissionSubmissions(res.missionSubmissions);
+        setMissions(previous => JSON.stringify(previous) === JSON.stringify(res.missions) ? previous : res.missions);
+        setMissionSubmissions(previous => JSON.stringify(previous) === JSON.stringify(res.missionSubmissions) ? previous : res.missionSubmissions);
       }
     } catch (error) {
       console.warn('Could not refresh missions and submissions from TiDB:', error);
@@ -1103,14 +1103,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     if (!response.success) throw new Error(response.message || 'Review gagal disimpan.');
 
-    const updatedAt = `${getTodayDateString()} ${getCurrentTimeWIB()}`;
     setMissionSubmissions(previous => previous.map(item => item.id === submissionId
-      ? {
+      ? response.submission || {
           ...item,
           status,
           points: reviewPoints,
           reviewedBy: currentUser.name,
-          reviewedAt: updatedAt,
           feedback: reviewFeedback,
         }
       : item

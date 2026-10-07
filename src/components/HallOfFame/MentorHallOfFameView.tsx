@@ -14,18 +14,27 @@ export const MentorHallOfFameView: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    api.getMentorHallOfFame()
-      .then(result => {
-        if (active) setRankings(result.mentors);
-      })
-      .catch(error => {
-        if (active) setLoadError(error.message || 'Gagal memuat poin mentor.');
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
+    const refresh = () => {
+      api.getMentorHallOfFame()
+        .then(result => {
+          if (active) setRankings(result.mentors);
+        })
+        .catch(error => {
+          if (active) setLoadError(error.message || 'Gagal memuat poin mentor.');
+        })
+        .finally(() => {
+          if (active) setIsLoading(false);
+        });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    const timer = window.setInterval(refresh, 30000);
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const handleResetTraineePoints = async () => {
