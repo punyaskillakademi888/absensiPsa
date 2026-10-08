@@ -1158,20 +1158,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             : r
         );
-        setDailyReports(updatedReports);
-        // Save immediately to prevent data loss on refresh before autosave
         if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
         try {
-          await api.saveAppData({
-            kejuruanList: currentUser.role === 'admin' ? kejuruanList : [],
-            attendanceRecords,
-            leaveRequests,
-            settings: null,
-            missions: [],
-            missionSubmissions: [],
-            dailyReports: updatedReports,
-          });
-          return { success: true, message: 'Laporan harian berhasil diperbarui dan dikembalikan ke mentor.' };
+          const revisedReport = updatedReports.find(report => report.id === existing.id)!;
+          const result = await api.submitDailyReport(revisedReport);
+          setDailyReports(previous => previous.map(report => report.id === existing.id ? result.report : report));
+          return { success: result.success, message: result.message };
         } catch (error: any) {
           console.error('[TiDB] Gagal menyimpan revisi laporan harian:', error);
           return { success: false, message: error.message || 'Gagal menyimpan revisi laporan harian.' };
@@ -1197,20 +1189,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       submittedAt: new Date().toISOString()
     };
     const newReports: DailyReport[] = [...dailyReports, newReport];
-    setDailyReports(newReports);
-    // Save immediately to prevent data loss on refresh before autosave
     if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
     try {
-      await api.saveAppData({
-        kejuruanList: currentUser.role === 'admin' ? kejuruanList : [],
-        attendanceRecords,
-        leaveRequests,
-        settings: null,
-        missions: [],
-        missionSubmissions: [],
-        dailyReports: newReports,
-      });
-      return { success: true, message: 'Laporan harian berhasil dikirim ke mentor!' };
+      const result = await api.submitDailyReport(newReport);
+      setDailyReports(previous => [...previous, result.report]);
+      return { success: result.success, message: result.message };
     } catch (error: any) {
       console.error('[TiDB] Gagal menyimpan laporan harian baru:', error);
       return { success: false, message: error.message || 'Gagal menyimpan laporan harian baru.' };

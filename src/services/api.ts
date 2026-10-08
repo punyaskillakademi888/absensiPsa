@@ -176,6 +176,13 @@ export const api = {
     });
   },
 
+  async submitDailyReport(report: DailyReport): Promise<{ success: boolean; message: string; report: DailyReport }> {
+    return this.request('/api/app-data/daily-reports', {
+      method: 'POST',
+      body: JSON.stringify(report),
+    });
+  },
+
   async saveAttendanceSettings(settings: AttendanceSettings): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>('/api/app-data/settings', {
       method: 'PUT',

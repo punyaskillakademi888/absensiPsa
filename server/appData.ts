@@ -542,6 +542,48 @@ appDataRouter.patch('/daily-reports/:id/review', authenticateToken, async (req: 
   }
 });
 
+appDataRouter.post('/daily-reports', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (user.role !== 'trainee') return res.status(403).json({ success: false, message: 'Hanya peserta yang dapat mengirim laporan.' });
+  const report = req.body || {};
+  const reportDate = dateValue(report.date);
+  const description = String(report.description || '').trim();
+  if (!reportDate || !/^\d{4}-\d{2}-\d{2}$/.test(reportDate) || !description) {
+    return res.status(400).json({ success: false, message: 'Tanggal dan catatan laporan wajib diisi.' });
+  }
+  try {
+    const pool = getPool();
+    const [existingRows] = await pool.query<any[]>(
+      'SELECT * FROM daily_reports WHERE trainee_id = ? AND report_date = ? LIMIT 1', [user.id, reportDate]
+    );
+    const existing = existingRows[0];
+    if (existing && existing.status !== 'rejected') {
+      return res.status(409).json({ success: false, message: 'Kamu sudah mengumpulkan laporan untuk tanggal ini.' });
+    }
+    const submittedAt = new Date().toISOString();
+    if (existing) {
+      await pool.query(
+        `UPDATE daily_reports SET description = ?, photo_url = ?, photo_name = ?, submission_link = ?, status = 'pending', submitted_at = ?, reviewed_by = NULL, reviewed_at = NULL, review_notes = NULL WHERE id = ? AND trainee_id = ? AND status = 'rejected'`,
+        [description, report.photoUrl || null, report.photoName || null, report.submissionLink || null, dateTimeValue(submittedAt), existing.id, user.id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO daily_reports (id,trainee_id,trainee_name,trainee_nim,trainee_avatar,kejuruan_id,kejuruan_name,report_date,description,photo_url,photo_name,submission_link,status,submitted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?)`,
+        [String(report.id || randomUUID()), user.id, user.name, user.nim || '', user.avatar || null, user.kejuruanId || null, user.kejuruanName || null, reportDate, description, report.photoUrl || null, report.photoName || null, report.submissionLink || null, dateTimeValue(submittedAt)]
+      );
+    }
+    const [savedRows] = await pool.query<any[]>(
+      'SELECT * FROM daily_reports WHERE trainee_id = ? AND report_date = ? LIMIT 1', [user.id, reportDate]
+    );
+    const saved = savedRows[0];
+    if (!saved) return res.status(500).json({ success: false, message: 'Laporan tersimpan tetapi gagal dibaca ulang.' });
+    return res.json({ success: true, message: existing ? 'Laporan berhasil diperbarui dan dikirim kembali ke mentor.' : 'Laporan harian berhasil dikirim ke mentor!', report: mapReport(saved) });
+  } catch (error: any) {
+    console.error('[Daily Report Submit Error]', error);
+    return res.status(500).json({ success: false, message: 'Laporan harian gagal disimpan ke TiDB.' });
+  }
+});
+
 appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const body = req.body || {};
@@ -621,14 +663,8 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
       }
     }
 
-    for (const r of lists.dailyReports) {
-      if (user.role === 'trainee' && !own(r)) continue;
-      const reviewUpdate = user.role === 'trainee'
-        ? 'description=VALUES(description),photo_url=VALUES(photo_url),photo_name=VALUES(photo_name),submission_link=VALUES(submission_link),status=VALUES(status),submitted_at=VALUES(submitted_at),reviewed_by=VALUES(reviewed_by),reviewed_at=VALUES(reviewed_at),review_notes=VALUES(review_notes)'
-        : 'description=VALUES(description),photo_url=VALUES(photo_url),photo_name=VALUES(photo_name),submission_link=VALUES(submission_link),status=VALUES(status),reviewed_by=VALUES(reviewed_by),reviewed_at=VALUES(reviewed_at),review_notes=VALUES(review_notes)';
-      await upsert(`INSERT INTO daily_reports (id,trainee_id,trainee_name,trainee_nim,trainee_avatar,kejuruan_id,kejuruan_name,report_date,description,photo_url,photo_name,submission_link,status,submitted_at,reviewed_by,reviewed_at,review_notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ${reviewUpdate}`,
-      [r.id,r.traineeId,r.traineeName,r.traineeNim,r.traineeAvatar || null,r.kejuruanId || null,r.kejuruanName || null,dateValue(r.date),r.description,r.photoUrl || null,r.photoName || null,r.submissionLink || null,user.role === 'trainee' ? 'pending' : r.status,dateTimeValue(r.submittedAt),user.role === 'trainee' ? null : r.reviewedBy || null,user.role === 'trainee' ? null : dateTimeValue(r.reviewedAt),user.role === 'trainee' ? null : r.reviewNotes || null]);
-    }
+    // Daily reports are written only through the single-report submit/review
+    // endpoints so stale whole-app snapshots cannot reset mentor decisions.
 
     await connection.commit();
     return res.json({ success: true, message: 'Data aplikasi tersimpan di TiDB.' });
