@@ -169,6 +169,13 @@ export const api = {
     });
   },
 
+  async reviewDailyReport(id: string, status: 'approved' | 'rejected', reviewNotes: string): Promise<{ success: boolean; message: string; report: DailyReport }> {
+    return this.request(`/api/app-data/daily-reports/${encodeURIComponent(id)}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, reviewNotes }),
+    });
+  },
+
   async saveAttendanceSettings(settings: AttendanceSettings): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>('/api/app-data/settings', {
       method: 'PUT',

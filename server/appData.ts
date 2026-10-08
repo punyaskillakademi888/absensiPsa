@@ -507,6 +507,41 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
   }
 });
 
+appDataRouter.patch('/daily-reports/:id/review', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (!['mentor', 'admin'].includes(user.role)) {
+    return res.status(403).json({ success: false, message: 'Hanya mentor atau admin yang dapat meninjau laporan.' });
+  }
+  const { status, reviewNotes } = req.body || {};
+  if (!['approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Status review tidak valid.' });
+  }
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query<any[]>('SELECT * FROM daily_reports WHERE id = ? LIMIT 1', [req.params.id]);
+    const report = rows[0];
+    if (!report) return res.status(404).json({ success: false, message: 'Laporan harian tidak ditemukan.' });
+    if (user.role === 'mentor') {
+      const programNames = assignedProgramNames(user);
+      const matchesProgram = String(report.kejuruan_id || '') === String(user.kejuruanId || '') ||
+        programNames.includes(String(report.kejuruan_name || '').trim().toLowerCase());
+      if (!matchesProgram) return res.status(403).json({ success: false, message: 'Review hanya dapat dilakukan untuk laporan pada kejuruan Anda.' });
+    }
+    const notes = String(reviewNotes || '').trim().slice(0, 2000);
+    await pool.query(
+      'UPDATE daily_reports SET status = ?, reviewed_by = ?, reviewed_at = NOW(), review_notes = ? WHERE id = ?',
+      [status, String(user.name || 'Mentor').slice(0, 64), notes, req.params.id]
+    );
+    const [savedRows] = await pool.query<any[]>('SELECT * FROM daily_reports WHERE id = ? LIMIT 1', [req.params.id]);
+    const saved = savedRows[0];
+    if (!saved) return res.status(500).json({ success: false, message: 'Review tersimpan tetapi hasilnya gagal dibaca ulang.' });
+    return res.json({ success: true, message: 'Review laporan harian berhasil disimpan.', report: mapReport(saved) });
+  } catch (error: any) {
+    console.error('[Daily Report Review Error]', error);
+    return res.status(500).json({ success: false, message: 'Review laporan harian gagal disimpan ke TiDB.' });
+  }
+});
+
 appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const body = req.body || {};

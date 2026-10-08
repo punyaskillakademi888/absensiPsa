@@ -1223,30 +1223,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status: 'approved' | 'rejected',
     reviewNotes?: string
   ): Promise<{ success: boolean; message: string }> => {
-    const updatedReports = dailyReports.map(r =>
-        r.id === reportId
-          ? {
-              ...r,
-              status,
-              reviewedBy: currentUser.name,
-              reviewedAt: new Date().toISOString(),
-              reviewNotes: reviewNotes || ''
-            }
-          : r
-    );
-    setDailyReports(updatedReports);
     if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
     try {
-      const result = await api.saveAppData({
-        kejuruanList: currentUser.role === 'admin' ? kejuruanList : [],
-        attendanceRecords,
-        leaveRequests,
-        settings: null,
-        missions: [],
-        missionSubmissions: [],
-        dailyReports: updatedReports,
-      });
-      return result;
+      const result = await api.reviewDailyReport(reportId, status, reviewNotes || '');
+      setDailyReports(previous => previous.map(report => report.id === reportId ? result.report : report));
+      return { success: result.success, message: result.message };
     } catch (error: any) {
       console.error('[TiDB] Gagal menyimpan verifikasi laporan:', error);
       return { success: false, message: error.message || 'Verifikasi laporan gagal disimpan.' };
