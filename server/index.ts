@@ -90,24 +90,6 @@ app.use((req, res, next) => {
   return express.json({ limit: '10mb' })(req, res, next);
 });
 
-// Vercel Functions have no persistent server startup hook. Initialize once per
-// warm function instance before the first API request instead of calling listen().
-if (isVercelRuntime) {
-  let databaseInitialization: Promise<void> | null = null;
-  app.use((req, res, next) => {
-    const path = (req.path || req.url || '').split('?')[0];
-    if (path === '/api/health' || path === '/health') {
-      return next();
-    }
-    databaseInitialization ??= initDatabase();
-    databaseInitialization.then(() => next()).catch(error => {
-      databaseInitialization = null;
-      console.error('[TiDB] Initialization failed in Vercel Function:', error);
-      res.status(503).json({ success: false, message: 'Database belum siap. Coba lagi beberapa saat.', error: (error as Error).message });
-    });
-  });
-}
-
 app.use('/api/app-data', appDataRouter);
 
 app.post('/api/upload/signature', authenticateToken, (req: AuthenticatedRequest, res: Response) => {

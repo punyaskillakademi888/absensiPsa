@@ -8,6 +8,8 @@ Frontend (Vite) dan backend (Express di `api/`) harus berada di **satu project V
 
 ## Environment variables
 
+Variabel TiDB harus tersedia pada tahap build karena Vercel menjalankan migrasi skema sebelum membangun frontend.
+
 Tambahkan variabel berikut pada Vercel Project Settings → Environment Variables untuk Production **dan** Preview. Isi nilainya di dashboard; jangan commit file `.env`.
 
 Wajib:

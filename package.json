@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "server": "node --require ./scripts/tsx-userinfo-fallback.cjs ./node_modules/tsx/dist/cli.mjs server/index.ts",
+    "migrate:schema": "node --require ./scripts/tsx-userinfo-fallback.cjs ./node_modules/tsx/dist/cli.mjs server/migrateSchema.ts",
     "migrate:tidb": "node --require ./scripts/tsx-userinfo-fallback.cjs ./node_modules/tsx/dist/cli.mjs server/migrateTidb.ts",
     "dev:all": "concurrently -k -n \"server,client\" -c \"cyan,magenta\" \"node --require ./scripts/tsx-userinfo-fallback.cjs ./node_modules/tsx/dist/cli.mjs server/index.ts\" \"vite --port=3000 --host=0.0.0.0\"",
     "build": "vite build",

@@ -129,6 +129,26 @@ interface AppContextType {
   resetToDefaultData: () => void;
 }
 
+type AutosaveSnapshot = {
+  kejuruanList: Kejuruan[];
+  attendanceRecords: AttendanceRecord[];
+  leaveRequests: LeaveRequest[];
+  missionSubmissions: MissionSubmission[];
+};
+
+function changedRows<T extends { id: string }>(current: T[], saved: T[]): T[] {
+  const savedById = new Map<string, string>();
+  saved.forEach(row => savedById.set(row.id, JSON.stringify(row)));
+  return current.filter(row => savedById.get(row.id) !== JSON.stringify(row));
+}
+
+function mergeSavedRows<T extends { id: string }>(saved: T[], updated: T[]): T[] {
+  const rows = new Map<string, T>();
+  saved.forEach(row => rows.set(row.id, row));
+  updated.forEach(row => rows.set(row.id, row));
+  return [...rows.values()];
+}
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -144,6 +164,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [appDataReady, setAppDataReady] = useState(false);
   const attendanceWriteRef = useRef<Promise<void> | null>(null);
   const attendanceRevisionRef = useRef(0);
+  const autosaveBaselineRef = useRef<AutosaveSnapshot | null>(null);
 
   // Verify JWT session and check TiDB health on startup
   useEffect(() => {
@@ -288,6 +309,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const data = await api.getAppData();
         if (!active) return;
+        autosaveBaselineRef.current = {
+          kejuruanList: data.kejuruanList,
+          attendanceRecords: data.attendanceRecords,
+          leaveRequests: data.leaveRequests,
+          missionSubmissions: data.missionSubmissions,
+        };
         const loadedKejuruanList = data.kejuruanList.length ? data.kejuruanList : INITIAL_KEJURUAN;
         setKejuruanList(canonicalizeKejuruanCatalog(loadedKejuruanList));
         setAttendanceRecords(previous => {
@@ -330,20 +357,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const timer = window.setTimeout(async () => {
       const isAdmin = currentUser.role === 'admin';
       const isTrainee = currentUser.role === 'trainee';
+      const baseline = autosaveBaselineRef.current;
+      if (!baseline) return;
+      const changedKejuruan = isAdmin ? changedRows(kejuruanList, baseline.kejuruanList) : [];
+      const changedAttendance = changedRows(attendanceRecords, baseline.attendanceRecords);
+      const changedLeaveRequests = changedRows(leaveRequests, baseline.leaveRequests);
+      const changedSubmissions = isTrainee
+        ? changedRows(missionSubmissions, baseline.missionSubmissions)
+        : [];
+      if (!changedKejuruan.length && !changedAttendance.length && !changedLeaveRequests.length && !changedSubmissions.length) return;
       try {
         await api.saveAppData({
-          kejuruanList: isAdmin ? kejuruanList : [],
-          attendanceRecords,
-          leaveRequests,
+          kejuruanList: changedKejuruan,
+          attendanceRecords: changedAttendance,
+          leaveRequests: changedLeaveRequests,
           // Settings are saved explicitly through saveAttendanceSettings so
           // an old autosave snapshot cannot overwrite the current office pin.
           settings: null,
           // Missions are written only through /api/missions. A snapshot can be stale
           // and must never recreate a mission after it has been deleted.
           missions: [],
-          missionSubmissions: isTrainee ? missionSubmissions : [],
-          dailyReports,
+          missionSubmissions: changedSubmissions,
+          dailyReports: [],
         });
+        autosaveBaselineRef.current = {
+          kejuruanList: mergeSavedRows(baseline.kejuruanList, changedKejuruan),
+          attendanceRecords: mergeSavedRows(baseline.attendanceRecords, changedAttendance),
+          leaveRequests: mergeSavedRows(baseline.leaveRequests, changedLeaveRequests),
+          missionSubmissions: mergeSavedRows(baseline.missionSubmissions, changedSubmissions),
+        };
         setTidbStatus('connected');
       } catch (error) {
         console.error('[TiDB] Gagal menyimpan data project:', error);
@@ -351,7 +393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [appDataReady, isAuthenticated, jwtToken, currentUser.role, kejuruanList, attendanceRecords, leaveRequests, missionSubmissions, dailyReports]);
+  }, [appDataReady, isAuthenticated, jwtToken, currentUser.role, kejuruanList, attendanceRecords, leaveRequests, missionSubmissions]);
 
 
   const loginWithCode = async (
