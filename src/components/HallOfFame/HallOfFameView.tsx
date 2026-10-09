@@ -36,7 +36,7 @@ interface TraineeRanking {
 }
 
 export const HallOfFameView: React.FC = () => {
-  const { users, missionSubmissions, currentUser, setActiveTab, refreshMissions, getLatePenaltyPoints, getAbsentPenaltyPoints } = useApp();
+  const { users, missionSubmissions, currentUser, setActiveTab, getLatePenaltyPoints, getAbsentPenaltyPoints } = useApp();
 
   const [selectedTraineeDetail, setSelectedTraineeDetail] = useState<TraineeRanking | null>(null);
   const [leaderboardTrainees, setLeaderboardTrainees] = useState<TraineeHallOfFameEntry[] | null>(null);
@@ -51,7 +51,6 @@ export const HallOfFameView: React.FC = () => {
     let active = true;
     setLeaderboardStatus('loading');
     const refresh = () => {
-      void refreshMissions();
       api.getTraineeHallOfFame()
         .then(result => {
           if (!active) return;
@@ -72,7 +71,7 @@ export const HallOfFameView: React.FC = () => {
       window.removeEventListener('focus', refresh);
       window.clearInterval(timer);
     };
-  }, [currentUser.role, refreshMissions]);
+  }, [currentUser.role]);
 
   // All trainees
   const trainees = useMemo(() => {

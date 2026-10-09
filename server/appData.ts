@@ -6,6 +6,7 @@ import { canonicalKejuruanCode } from './kejuruanCodes.js';
 import {
   computeLatePenalty,
   computeAbsentPenalty,
+  ABSENT_PENALTY_START_DATE,
   normalizeLatePointPenaltyPerMinute,
   normalizeAbsentPointPenaltyPerDay,
   todayWib,
@@ -49,7 +50,7 @@ const parseWorkDays = (setting: any): number[] => {
 
 // Tanggal yang dikecualikan dari hitungan "tidak absen": hari dengan check-in
 // dan hari yang tercakup izin/sakit yang sudah disetujui.
-const buildExemptDates = async (): Promise<Map<string, Set<string>>> => {
+const buildExemptDates = async (startDate: string, endDate: string): Promise<Map<string, Set<string>>> => {
   const pool = getPool();
   const exemptByUser = new Map<string, Set<string>>();
   const add = (userId: string, date: string) => {
@@ -60,21 +61,25 @@ const buildExemptDates = async (): Promise<Map<string, Set<string>>> => {
   };
 
   const [attendanceRows] = await pool.query<any[]>(
-    'SELECT user_id, attendance_date FROM attendance_records WHERE check_in_time IS NOT NULL'
+    `SELECT user_id, attendance_date FROM attendance_records
+     WHERE check_in_time IS NOT NULL AND attendance_date >= ? AND attendance_date <= ?`,
+    [startDate, endDate]
   );
   for (const row of attendanceRows) {
     add(String(row.user_id), dateText(row.attendance_date));
   }
 
   const [leaveRows] = await pool.query<any[]>(
-    "SELECT user_id, start_date, end_date FROM leave_requests WHERE status = 'approved'"
+    `SELECT user_id, start_date, end_date FROM leave_requests
+     WHERE status = 'approved' AND end_date >= ? AND start_date <= ?`,
+    [startDate, endDate]
   );
   for (const row of leaveRows) {
     const start = dateText(row.start_date);
     const end = dateText(row.end_date);
     if (!start || !end) continue;
-    let timestamp = Date.parse(`${start}T00:00:00Z`);
-    const endTimestamp = Date.parse(`${end}T00:00:00Z`);
+    let timestamp = Math.max(Date.parse(`${start}T00:00:00Z`), Date.parse(`${startDate}T00:00:00Z`));
+    const endTimestamp = Math.min(Date.parse(`${end}T00:00:00Z`), Date.parse(`${endDate}T00:00:00Z`));
     for (let guard = 0; timestamp <= endTimestamp && guard < 400; timestamp += 86_400_000, guard += 1) {
       add(String(row.user_id), new Date(timestamp).toISOString().slice(0, 10));
     }
@@ -315,14 +320,15 @@ appDataRouter.get('/hall-of-fame/trainees', authenticateToken, async (req: Authe
         ) late_penalties ON late_penalties.user_id = u.id
         WHERE u.role = 'trainee'
       `);
-    const exemptByUser = await buildExemptDates();
+    const today = todayWib();
+    const exemptByUser = await buildExemptDates(ABSENT_PENALTY_START_DATE, today);
 
     const trainees = rows.map((row: any) => {
       const latePenaltyPoints = Number(row.total_late_penalty || 0);
       const absent = computeAbsentPenalty({
         workDays,
         absentPointPenaltyPerDay,
-        today: todayWib(),
+        today,
         joinedDate: row.joined_date,
         attendedOrLeaveDates: exemptByUser.get(String(row.id)) || [],
       });

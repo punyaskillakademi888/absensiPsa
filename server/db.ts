@@ -256,7 +256,8 @@ export async function initDatabase() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_attendance_user_date (user_id, attendance_date),
       INDEX idx_attendance_date_status (attendance_date, verification_status),
-      INDEX idx_attendance_kejuruan_date (kejuruan_id, attendance_date)
+      INDEX idx_attendance_kejuruan_date (kejuruan_id, attendance_date),
+      INDEX idx_attendance_late_penalty_user (late_penalty_points, user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `,
     `
@@ -345,7 +346,8 @@ export async function initDatabase() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_submissions_mission (mission_id, status),
       INDEX idx_submissions_trainee (trainee_id, submitted_at),
-      INDEX idx_submissions_kejuruan (kejuruan_id, status)
+      INDEX idx_submissions_kejuruan (kejuruan_id, status),
+      INDEX idx_submissions_status_trainee_points (status, trainee_id, points)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `,
     `
@@ -420,6 +422,24 @@ export async function initDatabase() {
   );
   if (latePenaltyRateColumns.length === 0) {
     await p.query('ALTER TABLE attendance_settings ADD COLUMN late_point_penalty_per_minute INT NOT NULL DEFAULT 1 AFTER office_location');
+  }
+
+  const [latePenaltyIndex] = await p.query<any[]>(
+    `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_records' AND INDEX_NAME = 'idx_attendance_late_penalty_user'`,
+    [database]
+  );
+  if (latePenaltyIndex.length === 0) {
+    await p.query('ALTER TABLE attendance_records ADD INDEX idx_attendance_late_penalty_user (late_penalty_points, user_id)');
+  }
+
+  const [submissionPointsIndex] = await p.query<any[]>(
+    `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'mission_submissions' AND INDEX_NAME = 'idx_submissions_status_trainee_points'`,
+    [database]
+  );
+  if (submissionPointsIndex.length === 0) {
+    await p.query('ALTER TABLE mission_submissions ADD INDEX idx_submissions_status_trainee_points (status, trainee_id, points)');
   }
 
   // Tarif pengurangan poin per hari tidak absen (diatur admin, default 1).
