@@ -286,6 +286,10 @@ export const INITIAL_USERS: User[] = [
 export const INITIAL_SETTINGS: AttendanceSettings = {
   startTime: '09:00',
   lateLimitTime: '09:00',
+  // Default: 1 menit terlambat = 1 poin berkurang dari Hall of Fame peserta.
+  latePointPenaltyPerMinute: 1,
+  // Default: 1 hari kerja tidak absen = 1 poin berkurang dari Hall of Fame peserta.
+  absentPointPenaltyPerDay: 1,
   endTime: '17:00',
   allowCheckoutStart: '16:00',
   workDays: [1, 2, 3, 4, 5], // Mon-Fri

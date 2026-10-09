@@ -117,9 +117,10 @@ export const TraineeDashboard: React.FC = () => {
       const ss = String(now.getSeconds()).padStart(2, '0');
       const timeStr = `${hh}.${mm}.${ss}`;
       setLiveTime(timeStr);
-      // Compare HH:MM against 09:00 (jam masuk resmi)
+      // Bandingkan HH:MM dengan batas toleransi dari pengaturan admin (mis. 09:00)
       const currentHHMM = `${hh}:${mm}`;
-      setIsCurrentlyLate(currentHHMM > '09:00');
+      const lateLimitHHMM = String(settings.lateLimitTime || '09:00').slice(0, 5);
+      setIsCurrentlyLate(currentHHMM > lateLimitHHMM);
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -225,8 +226,8 @@ export const TraineeDashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-[#0D2F47] px-5 py-3 text-center text-sm font-bold text-white shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <Check className="w-4 h-4 text-[#A9C7DE]" />
+        <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-[#0D2F47] px-5 py-3 text-center text-sm font-bold text-white shadow-xl flex items-center gap-2 max-w-[92vw] animate-in fade-in slide-in-from-bottom-2">
+          <Check className="w-4 h-4 text-[#A9C7DE] shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -240,9 +241,11 @@ export const TraineeDashboard: React.FC = () => {
               Perhatian: Kamu Terlambat!
             </p>
             <p className="mt-0.5 text-xs text-amber-700 leading-relaxed">
-              Jam masuk resmi adalah pukul <strong>09.00 WIB</strong>. Check-in setelah jam tersebut
-              akan dicatat sebagai <strong>Terlambat</strong> dan akan mendapatkan{' '}
-              <strong>pengurangan poin kehadiran</strong>. Segera lakukan check-in sekarang.
+              Batas toleransi check-in hari ini pukul{' '}
+              <strong>{String(settings.lateLimitTime || '09:00').slice(0, 5)} WIB</strong>. Check-in
+              setelah jam tersebut akan dicatat sebagai <strong>Terlambat</strong> dan mengurangi{' '}
+              <strong>{settings.latePointPenaltyPerMinute ?? 1} poin Hall of Fame</strong> untuk
+              setiap menit keterlambatan. Segera lakukan check-in sekarang.
             </p>
           </div>
         </div>
@@ -551,11 +554,20 @@ export const TraineeDashboard: React.FC = () => {
           <div className="mt-6 rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] p-3 text-xs text-[#6F7F8D] space-y-1">
             <p className="font-bold text-[#123B59]">Aturan Absensi:</p>
             <p className="text-[11px] leading-relaxed">
-              Jam Masuk: <strong className="text-[#123B59]">09.00 WIB</strong>
-              {' '}&middot; Pulang: <strong className="text-[#123B59]">17.00 WIB</strong>.
+              Jam Masuk: <strong className="text-[#123B59]">{String(settings.startTime || '09:00').slice(0, 5)} WIB</strong>
+              {' '}&middot; Pulang: <strong className="text-[#123B59]">{String(settings.endTime || '17:00').slice(0, 5)} WIB</strong>.
             </p>
             <p className="text-[11px] leading-relaxed text-amber-700">
-              ⚠ Check-in lebih dari pukul <strong>09.00 WIB</strong> dihitung <strong>Terlambat</strong> dan mendapat pengurangan poin.
+              ⚠ Check-in lebih dari pukul{' '}
+              <strong>{String(settings.lateLimitTime || '09:00').slice(0, 5)} WIB</strong> dihitung{' '}
+              <strong>Terlambat</strong> dan mengurangi{' '}
+              <strong>{settings.latePointPenaltyPerMinute ?? 1} poin</strong> Hall of Fame per menit
+              keterlambatan.
+            </p>
+            <p className="text-[11px] leading-relaxed text-amber-700">
+              ⚠ Hari kerja tanpa absen sejak 1 Oktober 2026 (kecuali izin/sakit yang disetujui)
+              mengurangi <strong>{settings.absentPointPenaltyPerDay ?? 1} poin</strong> Hall of Fame
+              per hari.
             </p>
           </div>
         </aside>

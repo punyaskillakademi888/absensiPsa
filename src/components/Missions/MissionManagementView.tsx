@@ -58,6 +58,7 @@ export const MissionManagementView: React.FC = () => {
     kejuruanList,
     missions,
     missionSubmissions,
+    attendanceRecords,
     addMission,
     updateMission,
     deleteMission,
@@ -65,6 +66,8 @@ export const MissionManagementView: React.FC = () => {
     reviewMissionSubmission,
     resetMentorMissionData,
     getUserPoints,
+    getLatePenaltyPoints,
+    getAbsentPenaltyPoints,
     refreshMissions,
     jwtToken
   } = useApp();
@@ -213,6 +216,12 @@ export const MissionManagementView: React.FC = () => {
   const traineeCompletedMissions = useMemo(() => {
     return missionSubmissions.filter(s => s.traineeId === currentUser.id && s.status === 'approved').length;
   }, [missionSubmissions, currentUser.id]);
+
+  // Poin yang dipotong karena peserta telat check-in atau tidak absen.
+  const traineeLatePenalty = useMemo(() => {
+    if (!isTrainee) return 0;
+    return getLatePenaltyPoints(currentUser.id) + getAbsentPenaltyPoints(currentUser.id);
+  }, [isTrainee, currentUser.id, getLatePenaltyPoints, getAbsentPenaltyPoints, attendanceRecords]);
 
   // Open Create Mission Modal
   const handleOpenCreateModal = () => {
@@ -480,6 +489,17 @@ export const MissionManagementView: React.FC = () => {
                   {traineeCompletedMissions}
                 </div>
               </div>
+              {traineeLatePenalty > 0 && (
+                <>
+                  <div className="h-6 w-px bg-[#E4EAF0]" />
+                  <div>
+                    <div className="text-[10px] text-[#6F7F8D]">Potongan</div>
+                    <div className="text-sm font-bold text-[#C05621] font-mono tabular-nums leading-none" title="Poin Hall of Fame yang dipotong karena keterlambatan check-in dan hari kerja tanpa absen">
+                      -{traineeLatePenalty} Pts
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

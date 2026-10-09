@@ -17,6 +17,7 @@ import {
   INITIAL_SETTINGS,
 } from '../data/mockData';
 import { getTodayDateString, getCurrentTimeWIB } from '../utils/dateUtils';
+import { computeLatePenalty, computeAbsentPenalty, isLateCheckIn, normalizeLatePointPenaltyPerMinute, normalizeAbsentPointPenaltyPerDay, DEFAULT_LATE_POINT_PENALTY_PER_MINUTE } from '../utils/latePenalty';
 import { generate8DigitLoginCode, generateDefaultPassword } from '../utils/userExcelUtils';
 import { canonicalizeKejuruanCatalog } from '../utils/kejuruanCodes';
 import confetti from 'canvas-confetti';
@@ -81,6 +82,10 @@ interface AppContextType {
     awardedPoints?: number
   ) => Promise<void>;
   getUserPoints: (userId: string) => number;
+  // Total poin yang dipotong karena keterlambatan check-in peserta.
+  getLatePenaltyPoints: (userId: string) => number;
+  // Total poin yang dipotong karena hari kerja tanpa absen (sejak Oktober).
+  getAbsentPenaltyPoints: (userId: string) => number;
   // Daily Reports
   dailyReports: DailyReport[];
   submitDailyReport: (data: {
@@ -495,8 +500,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const currentTime = getCurrentTimeWIB();
-    const isLate = currentTime > `${settings.lateLimitTime}:00`;
+    const isLate = isLateCheckIn(settings.lateLimitTime, currentTime);
     const status: AttendanceStatus = isLate ? 'terlambat' : 'hadir';
+    const latePenalty = computeLatePenalty(settings, { role: currentUser.role, status, checkInTime: currentTime });
 
     const isAdmin = currentUser.role === 'admin';
     const isMentor = currentUser.role === 'mentor';
@@ -532,7 +538,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       checkInCoordinates: coordinates,
       notes: notes || (isLate ? 'Terlambat check-in' : 'Hadir tepat waktu'),
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      lateMinutes: latePenalty.lateMinutes,
+      latePenaltyPoints: latePenalty.latePenaltyPoints
     };
 
     const savedRecord = await persistAttendanceRecord(newRecord);
@@ -557,6 +565,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let msg = '';
     if (isTrainee) {
       msg = `Check-In Berhasil dicatat (${savedRecord.checkInTime} WIB). Status: ${status === 'terlambat' ? 'Terlambat' : 'Tepat Waktu'}. Menunggu verifikasi kehadiran oleh Mentor Kejuruan Anda.`;
+      const appliedPenalty = savedRecord.latePenaltyPoints ?? latePenalty.latePenaltyPoints;
+      const appliedMinutes = savedRecord.lateMinutes ?? latePenalty.lateMinutes;
+      if (status === 'terlambat' && appliedPenalty > 0) {
+        msg += ` Perhatian: terlambat ${appliedMinutes} menit sehingga ${appliedPenalty} poin Hall of Fame Anda dikurangi (${appliedMinutes} menit x ${settings.latePointPenaltyPerMinute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE} poin).`;
+      }
     } else if (isMentor) {
       msg = savedRecord.checkInTime === currentTime
         ? `Check-In Instruktur Berhasil dicatat (${savedRecord.checkInTime} WIB). Status: ${status === 'terlambat' ? 'Terlambat' : 'Tepat Waktu'}. Menunggu verifikasi kehadiran oleh Administrator.`
@@ -769,6 +782,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       verifiedBy: `${currentUser.name} (${currentUser.role === 'admin' ? 'Admin' : 'Mentor'})`,
       verifiedAt: `${getTodayDateString()} ${getCurrentTimeWIB()}`,
       notes: record.notes || `Diverifikasi oleh ${currentUser.name}`,
+      ...computeLatePenalty(settings, {
+        role: record.userRole,
+        status: newStatus,
+        checkInTime: record.checkInTime,
+      }),
     };
     setAttendanceRecords(prev => prev.map(item => item.id === recordId ? updatedRecord : item));
     void persistAttendanceRecord(updatedRecord);
@@ -784,6 +802,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
     const existing = attendanceRecords.find(record => record.userId === userId && record.date === date);
+    const nextCheckInTime = checkInTime || existing?.checkInTime || (status === 'hadir' ? '08:00:00' : status === 'terlambat' ? '08:25:00' : undefined);
     const updatedRecord: AttendanceRecord = {
       ...existing,
       id: existing?.id || `att-${userId}-${date}`,
@@ -794,12 +813,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       kejuruanId: targetUser.kejuruanId || 'kj-1',
       kejuruanName: targetUser.kejuruanName || 'Umum',
       date,
-      checkInTime: checkInTime || existing?.checkInTime || (status === 'hadir' ? '08:00:00' : status === 'terlambat' ? '08:25:00' : undefined),
+      checkInTime: nextCheckInTime,
       status,
       verificationStatus: 'verified',
       verifiedBy: `${currentUser.name} (${currentUser.role === 'admin' ? 'Admin' : 'Mentor'})`,
       verifiedAt: `${getTodayDateString()} ${getCurrentTimeWIB()}`,
-      notes: notes || existing?.notes || `Diverifikasi manual oleh ${currentUser.name}`
+      notes: notes || existing?.notes || `Diverifikasi manual oleh ${currentUser.name}`,
+      ...computeLatePenalty(settings, { role: targetUser.role, status, checkInTime: nextCheckInTime })
     };
     setAttendanceRecords(prev => [updatedRecord, ...prev.filter(record => record.id !== updatedRecord.id)]);
     void persistAttendanceRecord(updatedRecord);
@@ -952,7 +972,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSettings = async (newSettings: Partial<AttendanceSettings>): Promise<{ success: boolean; message: string }> => {
-    const updatedSettings = { ...settings, ...newSettings };
+    const mergedSettings = { ...settings, ...newSettings };
+    const updatedSettings: AttendanceSettings = {
+      ...mergedSettings,
+      // Tarif penalti keterlambatan diatur admin; default 1 poin per menit.
+      latePointPenaltyPerMinute: normalizeLatePointPenaltyPerMinute(
+        mergedSettings.latePointPenaltyPerMinute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
+      ),
+      // Tarif penalti hari kerja tanpa absen; default 1 poin per hari.
+      absentPointPenaltyPerDay: normalizeAbsentPointPenaltyPerDay(
+        mergedSettings.absentPointPenaltyPerDay ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
+      ),
+    };
     try {
       await api.saveAttendanceSettings(updatedSettings);
       setSettings(updatedSettings);
@@ -1123,10 +1154,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const getLatePenaltyPoints = (userId: string) => {
+    return attendanceRecords
+      .filter(record => record.userId === userId)
+      .reduce((total, record) => total + computeLatePenalty(settings, {
+        role: record.userRole,
+        status: record.status,
+        checkInTime: record.checkInTime,
+      }).latePenaltyPoints, 0);
+  };
+
+  // Hari kerja sejak 1 Oktober 2026 (atau tanggal gabung) tanpa absen, kecuali
+  // hari yang sudah check-in atau tercakup izin/sakit yang disetujui.
+  const getAbsentPenaltyPoints = (userId: string) => {
+    const trainee = users.find(u => u.id === userId);
+    if (!trainee || trainee.role !== 'trainee') return 0;
+
+    const exemptDates = new Set<string>();
+    attendanceRecords.forEach(record => {
+      if (record.userId === userId && record.checkInTime && record.date) {
+        exemptDates.add(String(record.date).slice(0, 10));
+      }
+    });
+    leaveRequests.forEach(request => {
+      if (request.userId !== userId || request.status !== 'approved') return;
+      let timestamp = Date.parse(`${request.startDate}T00:00:00Z`);
+      const endTimestamp = Date.parse(`${request.endDate}T00:00:00Z`);
+      for (let guard = 0; timestamp <= endTimestamp && guard < 400; timestamp += 86_400_000, guard += 1) {
+        exemptDates.add(new Date(timestamp).toISOString().slice(0, 10));
+      }
+    });
+
+    return computeAbsentPenalty({
+      workDays: settings.workDays,
+      absentPointPenaltyPerDay: settings.absentPointPenaltyPerDay,
+      today: getTodayDateString(),
+      joinedDate: trainee.joinedDate,
+      attendedOrLeaveDates: exemptDates,
+    }).absentPenaltyPoints;
+  };
+
   const getUserPoints = (userId: string) => {
-    return missionSubmissions
+    const earnedPoints = missionSubmissions
       .filter(s => s.traineeId === userId && s.status === 'approved')
       .reduce((sum, s) => sum + s.points, 0);
+    // Poin Hall of Fame peserta selalu dikurangi penalti keterlambatan dan
+    // ketidakhadiran check-in.
+    return Math.max(
+      0,
+      earnedPoints - getLatePenaltyPoints(userId) - getAbsentPenaltyPoints(userId)
+    );
   };
 
   // Daily Report: submit (trainee) — 1 per day per user
@@ -1277,6 +1354,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submitMissionWork,
         reviewMissionSubmission,
         getUserPoints,
+        getLatePenaltyPoints,
+        getAbsentPenaltyPoints,
         submitDailyReport,
         reviewDailyReport,
         addUser,

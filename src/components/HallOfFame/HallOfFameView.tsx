@@ -22,6 +22,8 @@ import {
 interface TraineeRanking {
   user: Pick<User, 'id' | 'nim' | 'name' | 'avatar' | 'kejuruanId' | 'kejuruanName'>;
   totalPoints: number;
+  latePenaltyPoints: number;
+  absentPenaltyPoints: number;
   completedMissionsCount: number;
   approvedSubmissions: MissionSubmission[];
   rank: number;
@@ -34,7 +36,7 @@ interface TraineeRanking {
 }
 
 export const HallOfFameView: React.FC = () => {
-  const { users, missionSubmissions, currentUser, setActiveTab, refreshMissions } = useApp();
+  const { users, missionSubmissions, currentUser, setActiveTab, refreshMissions, getLatePenaltyPoints, getAbsentPenaltyPoints } = useApp();
 
   const [selectedTraineeDetail, setSelectedTraineeDetail] = useState<TraineeRanking | null>(null);
   const [leaderboardTrainees, setLeaderboardTrainees] = useState<TraineeHallOfFameEntry[] | null>(null);
@@ -98,9 +100,17 @@ export const HallOfFameView: React.FC = () => {
         s => s.traineeId === user.id && s.status === 'approved'
       );
 
+      // Peserta telat / tidak absen: poin Hall of Fame mereka dikurangi penalti.
+      const latePenaltyPoints = isLeaderboardEntry
+        ? Number(trainee.latePenaltyPoints || 0)
+        : getLatePenaltyPoints(user.id);
+      const absentPenaltyPoints = isLeaderboardEntry
+        ? Number(trainee.absentPenaltyPoints || 0)
+        : getAbsentPenaltyPoints(user.id);
+      const earnedPoints = userApprovedSubmissions.reduce((sum, s) => sum + s.points, 0);
       const totalPoints = isLeaderboardEntry
         ? trainee.totalPoints
-        : userApprovedSubmissions.reduce((sum, s) => sum + s.points, 0);
+        : Math.max(0, earnedPoints - latePenaltyPoints - absentPenaltyPoints);
       const completedMissionsCount = isLeaderboardEntry
         ? trainee.completedMissionsCount
         : userApprovedSubmissions.length;
@@ -146,6 +156,8 @@ export const HallOfFameView: React.FC = () => {
       return {
         user,
         totalPoints,
+        latePenaltyPoints,
+        absentPenaltyPoints,
         completedMissionsCount,
         approvedSubmissions: userApprovedSubmissions,
         rank: 0,
@@ -166,7 +178,7 @@ export const HallOfFameView: React.FC = () => {
       ...item,
       rank: idx + 1
     }));
-  }, [currentUser.role, leaderboardTrainees, trainees, missionSubmissions]);
+  }, [currentUser.role, leaderboardTrainees, trainees, missionSubmissions, getLatePenaltyPoints, getAbsentPenaltyPoints]);
 
   // Current logged in trainee's standing
   const myRanking = useMemo(() => {
@@ -522,6 +534,16 @@ export const HallOfFameView: React.FC = () => {
                   <span className="font-mono text-base font-black text-amber-600">
                     {selectedTraineeDetail.totalPoints} Pts
                   </span>
+                  {selectedTraineeDetail.latePenaltyPoints > 0 && (
+                    <span className="text-[10px] font-semibold text-[#C05621] block">
+                      &minus;{selectedTraineeDetail.latePenaltyPoints} poin karena telat check-in
+                    </span>
+                  )}
+                  {selectedTraineeDetail.absentPenaltyPoints > 0 && (
+                    <span className="text-[10px] font-semibold text-[#C05621] block">
+                      &minus;{selectedTraineeDetail.absentPenaltyPoints} poin karena tidak absen
+                    </span>
+                  )}
                 </div>
               </div>
 

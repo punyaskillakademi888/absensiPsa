@@ -39,6 +39,9 @@ export interface TraineeHallOfFameEntry {
   kejuruanId?: string;
   kejuruanName?: string;
   totalPoints: number;
+  latePenaltyPoints?: number;
+  absentPenaltyPoints?: number;
+  absentDays?: number;
   completedMissionsCount: number;
 }
 
@@ -74,6 +77,9 @@ export interface AttendanceRecord {
   notes?: string;
   photoUrl?: string;
   rejectionReason?: string;
+  // Snapshot keterlambatan check-in: menit telat dan poin yang dipotong.
+  lateMinutes?: number;
+  latePenaltyPoints?: number;
 }
 
 export interface LeaveRequest {
@@ -100,6 +106,10 @@ export interface LeaveRequest {
 export interface AttendanceSettings {
   startTime: string; // "08:00"
   lateLimitTime: string; // "08:15"
+  // Poin yang dipotong dari peserta per menit keterlambatan check-in. Default 1.
+  latePointPenaltyPerMinute: number;
+  // Poin yang dipotong dari peserta per hari kerja yang tidak absen. Default 1.
+  absentPointPenaltyPerDay: number;
   endTime: string; // "17:00"
   allowCheckoutStart: string; // "16:00"
   workDays: number[]; // 1 = Senin, 5 = Jumat

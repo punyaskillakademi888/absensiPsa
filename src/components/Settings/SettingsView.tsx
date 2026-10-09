@@ -2,12 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MobileHeaderStatus } from '../MobileHeaderStatus';
 import { Clock, MapPin, Save, CheckCircle2, ShieldCheck, UserCheck, GraduationCap, LocateFixed } from 'lucide-react';
+import { DEFAULT_LATE_POINT_PENALTY_PER_MINUTE } from '../../utils/latePenalty';
 
 export const SettingsView: React.FC = () => {
   const { settings, updateSettings, resetToDefaultData } = useApp();
 
   const [startTime, setStartTime] = useState(settings.startTime);
   const [lateLimitTime, setLateLimitTime] = useState(settings.lateLimitTime);
+  const [latePointPenalty, setLatePointPenalty] = useState(
+    String(settings.latePointPenaltyPerMinute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE)
+  );
+  const [absentPointPenalty, setAbsentPointPenalty] = useState(
+    String(settings.absentPointPenaltyPerDay ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE)
+  );
   const [endTime, setEndTime] = useState(settings.endTime);
   const [locationName, setLocationName] = useState(settings.officeLocation.name || 'Punya Skill Akademi, Bandung');
   const [radiusMeters, setRadiusMeters] = useState(settings.officeLocation.radiusMeters);
@@ -21,6 +28,8 @@ export const SettingsView: React.FC = () => {
   useEffect(() => {
     setStartTime(settings.startTime);
     setLateLimitTime(settings.lateLimitTime);
+    setLatePointPenalty(String(settings.latePointPenaltyPerMinute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE));
+    setAbsentPointPenalty(String(settings.absentPointPenaltyPerDay ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE));
     setEndTime(settings.endTime);
     setLocationName(settings.officeLocation.name || 'Punya Skill Akademi, Bandung');
     setRadiusMeters(settings.officeLocation.radiusMeters);
@@ -33,9 +42,19 @@ export const SettingsView: React.FC = () => {
     setIsSaving(true);
     setSaveError('');
     setSavedSuccess(false);
+    const parsedPenalty = Number(latePointPenalty);
+    const penaltyPerMinute = latePointPenalty.trim() === '' || !Number.isFinite(parsedPenalty)
+      ? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
+      : parsedPenalty;
+    const parsedAbsentPenalty = Number(absentPointPenalty);
+    const absentPenaltyPerDay = absentPointPenalty.trim() === '' || !Number.isFinite(parsedAbsentPenalty)
+      ? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
+      : parsedAbsentPenalty;
     const result = await updateSettings({
       startTime,
       lateLimitTime,
+      latePointPenaltyPerMinute: penaltyPerMinute,
+      absentPointPenaltyPerDay: absentPenaltyPerDay,
       endTime,
       officeLocation: {
         lat: Number(officeLat),
@@ -64,7 +83,7 @@ export const SettingsView: React.FC = () => {
           Pengaturan Presensi & Lokasi GPS
         </h1>
         <p className="text-xs text-[#6F7F8D] mt-1">
-          Konfigurasi jam masuk pelatihan kejuruan, batas toleransi keterlambatan, dan parameter radius absensi.
+          Konfigurasi jam masuk pelatihan kejuruan, batas toleransi keterlambatan, tarif pengurangan poin per menit telat, dan parameter radius absensi.
         </p>
         <MobileHeaderStatus />
       </div>
@@ -120,6 +139,44 @@ export const SettingsView: React.FC = () => {
                 required
               />
               <span className="text-[11px] text-[#6F7F8D] mt-1 block">Check-in setelah jam ini = Terlambat + pengurangan poin</span>
+            </div>
+
+            <div>
+              <label className="block text-[#123B59] font-bold mb-1.5">
+                Poin Telat / Menit
+              </label>
+              <input
+                type="number"
+                value={latePointPenalty}
+                onChange={e => setLatePointPenalty(e.target.value)}
+                min={0}
+                max={500}
+                step={1}
+                className="w-full p-2.5 rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] text-[#C05621] font-bold outline-none focus:border-[#4C83B5]"
+                required
+              />
+              <span className="text-[11px] text-[#6F7F8D] mt-1 block">
+                Poin Hall of Fame peserta yang dipotong per menit keterlambatan check-in (default {DEFAULT_LATE_POINT_PENALTY_PER_MINUTE}, isi 0 untuk menonaktifkan)
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-[#123B59] font-bold mb-1.5">
+                Poin Tidak Absen / Hari
+              </label>
+              <input
+                type="number"
+                value={absentPointPenalty}
+                onChange={e => setAbsentPointPenalty(e.target.value)}
+                min={0}
+                max={500}
+                step={1}
+                className="w-full p-2.5 rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] text-[#C05621] font-bold outline-none focus:border-[#4C83B5]"
+                required
+              />
+              <span className="text-[11px] text-[#6F7F8D] mt-1 block">
+                Poin Hall of Fame peserta yang dipotong per hari kerja tanpa absen, dihitung sejak 1 Oktober 2026 (default {DEFAULT_LATE_POINT_PENALTY_PER_MINUTE}, isi 0 untuk menonaktifkan)
+              </span>
             </div>
 
             <div>

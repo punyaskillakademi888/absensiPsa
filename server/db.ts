@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import { computeLatePenalty, normalizeLatePointPenaltyPerMinute } from './latePenalty.js';
 
 dotenv.config();
 
@@ -140,6 +141,51 @@ export async function ensureDatabaseExists() {
   }
 }
 
+/**
+ * Samakan penalti keterlambatan pada record lama dengan tarif terbaru admin,
+ * supaya riwayat keterlambatan sebelum fitur ini ada ikut terpotong di Hall of Fame.
+ */
+async function backfillLatePenalties(p: mysql.Pool) {
+  try {
+    const [settingRows] = await p.query<any[]>(
+      'SELECT late_limit_time, late_point_penalty_per_minute FROM attendance_settings ORDER BY updated_at DESC LIMIT 1'
+    );
+    const setting = settingRows[0];
+    const penaltySettings = {
+      lateLimitTime: setting?.late_limit_time ? String(setting.late_limit_time) : '09:00',
+      latePointPenaltyPerMinute: normalizeLatePointPenaltyPerMinute(setting?.late_point_penalty_per_minute),
+    };
+    const [rows] = await p.query<any[]>(
+      `SELECT a.id, COALESCE(u.role, a.user_role) AS role, a.check_in_time, a.late_minutes, a.late_penalty_points
+         FROM attendance_records a
+         LEFT JOIN users u ON u.id = a.user_id
+        WHERE a.status = 'terlambat' AND a.check_in_time IS NOT NULL`
+    );
+    let updated = 0;
+    for (const row of rows) {
+      const penalty = computeLatePenalty(penaltySettings, {
+        role: row.role,
+        status: 'terlambat',
+        checkInTime: row.check_in_time,
+      });
+      if (penalty.lateMinutes === Number(row.late_minutes || 0) &&
+          penalty.latePenaltyPoints === Number(row.late_penalty_points || 0)) {
+        continue;
+      }
+      await p.query(
+        'UPDATE attendance_records SET late_minutes = ?, late_penalty_points = ? WHERE id = ?',
+        [penalty.lateMinutes, penalty.latePenaltyPoints, row.id]
+      );
+      updated += 1;
+    }
+    if (updated) {
+      console.log(`[TiDB] Penalti keterlambatan riwayat lama diperbarui pada ${updated} record presensi.`);
+    }
+  } catch (error: any) {
+    console.warn('[TiDB] Backfill penalti keterlambatan dilewati:', error?.message || error);
+  }
+}
+
 export async function initDatabase() {
   const { database } = getDbConfig();
   const p = getPool();
@@ -204,6 +250,8 @@ export async function initDatabase() {
       notes TEXT,
       photo_url LONGTEXT,
       rejection_reason TEXT,
+      late_minutes INT NOT NULL DEFAULT 0,
+      late_penalty_points INT NOT NULL DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_attendance_user_date (user_id, attendance_date),
@@ -247,6 +295,8 @@ export async function initDatabase() {
       allow_checkout_start TIME NOT NULL,
       work_days JSON NOT NULL,
       office_location JSON NOT NULL,
+      late_point_penalty_per_minute INT NOT NULL DEFAULT 1,
+      absent_point_penalty_per_day INT NOT NULL DEFAULT 1,
       updated_by VARCHAR(64),
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -347,6 +397,44 @@ export async function initDatabase() {
   if (attendanceWorkModeColumns.length === 0) {
     await p.query("ALTER TABLE attendance_records ADD COLUMN work_mode ENUM('WFO','WFH') NULL AFTER check_out_time");
   }
+
+  // Penalti keterlambatan check-in: menit telat dan poin yang dipotong per record.
+  const [latePenaltyColumns] = await p.query<any[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_records' AND COLUMN_NAME IN ('late_minutes','late_penalty_points')`,
+    [database]
+  );
+  const existingLatePenaltyColumns = new Set(latePenaltyColumns.map((row: any) => String(row.COLUMN_NAME)));
+  if (!existingLatePenaltyColumns.has('late_minutes')) {
+    await p.query('ALTER TABLE attendance_records ADD COLUMN late_minutes INT NOT NULL DEFAULT 0 AFTER rejection_reason');
+  }
+  if (!existingLatePenaltyColumns.has('late_penalty_points')) {
+    await p.query('ALTER TABLE attendance_records ADD COLUMN late_penalty_points INT NOT NULL DEFAULT 0 AFTER late_minutes');
+  }
+
+  // Tarif pengurangan poin per menit keterlambatan (diatur admin, default 1).
+  const [latePenaltyRateColumns] = await p.query<any[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_settings' AND COLUMN_NAME = 'late_point_penalty_per_minute'`,
+    [database]
+  );
+  if (latePenaltyRateColumns.length === 0) {
+    await p.query('ALTER TABLE attendance_settings ADD COLUMN late_point_penalty_per_minute INT NOT NULL DEFAULT 1 AFTER office_location');
+  }
+
+  // Tarif pengurangan poin per hari tidak absen (diatur admin, default 1).
+  const [absentPenaltyRateColumns] = await p.query<any[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_settings' AND COLUMN_NAME = 'absent_point_penalty_per_day'`,
+    [database]
+  );
+  if (absentPenaltyRateColumns.length === 0) {
+    await p.query('ALTER TABLE attendance_settings ADD COLUMN absent_point_penalty_per_day INT NOT NULL DEFAULT 1 AFTER late_point_penalty_per_minute');
+  }
+
+  // Riwayat keterlambatan lama harus ikut terpotong saat fitur ini diaktifkan,
+  // bukan hanya check-in baru setelah deploy.
+  await backfillLatePenalties(p);
 
   const [attendanceDayUniqueIndex] = await p.query<any[]>(
     `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS

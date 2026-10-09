@@ -3,6 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { getPool } from './db.js';
 import { authenticateToken, AuthenticatedRequest } from './auth.js';
 import { canonicalKejuruanCode } from './kejuruanCodes.js';
+import {
+  computeLatePenalty,
+  computeAbsentPenalty,
+  normalizeLatePointPenaltyPerMinute,
+  normalizeAbsentPointPenaltyPerDay,
+  todayWib,
+  DEFAULT_LATE_POINT_PENALTY_PER_MINUTE,
+  LatePenaltySettings,
+} from './latePenalty.js';
 
 export const appDataRouter = Router();
 
@@ -10,6 +19,68 @@ const dateValue = (value?: string) => value ? String(value).slice(0, 10) : null;
 const dateTimeValue = (value?: string) => value ? String(value).replace('T', ' ').replace(/Z$/, '').slice(0, 19) : null;
 const dateText = (value: any) => value instanceof Date ? value.toISOString().slice(0, 10) : value ? String(value).slice(0, 10) : '';
 const dateTimeText = (value: any) => value instanceof Date ? value.toISOString() : value ? String(value).replace(' ', 'T') : undefined;
+
+// Pengaturan penalti keterlambatan dari baris attendance_settings.
+const penaltySettingsFromRow = (row: any): LatePenaltySettings => ({
+  lateLimitTime: row?.late_limit_time ? String(row.late_limit_time) : '09:00',
+  latePointPenaltyPerMinute: normalizeLatePointPenaltyPerMinute(row?.late_point_penalty_per_minute),
+});
+
+const loadPenaltySettings = async (): Promise<LatePenaltySettings> => {
+  const [rows] = await getPool().query<any[]>(
+    'SELECT late_limit_time, late_point_penalty_per_minute FROM attendance_settings ORDER BY updated_at DESC LIMIT 1'
+  );
+  return penaltySettingsFromRow(rows[0]);
+};
+
+// workDays tersimpan sebagai JSON (1 = Senin ... 0 = Minggu).
+const parseWorkDays = (setting: any): number[] => {
+  try {
+    const parsed = typeof setting?.work_days === 'string' ? JSON.parse(setting.work_days) : setting?.work_days;
+    if (Array.isArray(parsed)) {
+      const days = parsed.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+      if (days.length) return days;
+    }
+  } catch {
+    // Jatuh ke hari kerja default di bawah.
+  }
+  return [1, 2, 3, 4, 5];
+};
+
+// Tanggal yang dikecualikan dari hitungan "tidak absen": hari dengan check-in
+// dan hari yang tercakup izin/sakit yang sudah disetujui.
+const buildExemptDates = async (): Promise<Map<string, Set<string>>> => {
+  const pool = getPool();
+  const exemptByUser = new Map<string, Set<string>>();
+  const add = (userId: string, date: string) => {
+    if (!userId || !date) return;
+    const set = exemptByUser.get(userId) || new Set<string>();
+    set.add(date);
+    exemptByUser.set(userId, set);
+  };
+
+  const [attendanceRows] = await pool.query<any[]>(
+    'SELECT user_id, attendance_date FROM attendance_records WHERE check_in_time IS NOT NULL'
+  );
+  for (const row of attendanceRows) {
+    add(String(row.user_id), dateText(row.attendance_date));
+  }
+
+  const [leaveRows] = await pool.query<any[]>(
+    "SELECT user_id, start_date, end_date FROM leave_requests WHERE status = 'approved'"
+  );
+  for (const row of leaveRows) {
+    const start = dateText(row.start_date);
+    const end = dateText(row.end_date);
+    if (!start || !end) continue;
+    let timestamp = Date.parse(`${start}T00:00:00Z`);
+    const endTimestamp = Date.parse(`${end}T00:00:00Z`);
+    for (let guard = 0; timestamp <= endTimestamp && guard < 400; timestamp += 86_400_000, guard += 1) {
+      add(String(row.user_id), new Date(timestamp).toISOString().slice(0, 10));
+    }
+  }
+  return exemptByUser;
+};
 
 const mapAttendance = (r: any) => ({
   id: r.id, userId: r.user_id, userName: r.user_name, userNim: r.user_nim, userRole: r.user_role,
@@ -19,6 +90,7 @@ const mapAttendance = (r: any) => ({
   verifiedAt: dateTimeText(r.verified_at), location: r.location || undefined,
   coordinates: r.latitude == null || r.longitude == null ? undefined : { lat: Number(r.latitude), lng: Number(r.longitude) },
   notes: r.notes || undefined, photoUrl: r.photo_url || undefined, rejectionReason: r.rejection_reason || undefined,
+  lateMinutes: Number(r.late_minutes || 0), latePenaltyPoints: Number(r.late_penalty_points || 0),
 });
 const mapLeave = (r: any) => ({
   id: r.id, userId: r.user_id, userName: r.user_name, userNim: r.user_nim, kejuruanId: r.kejuruan_id || '',
@@ -190,6 +262,12 @@ appDataRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res:
       settings: setting ? {
         startTime: setting.start_time, lateLimitTime: setting.late_limit_time, endTime: setting.end_time,
         allowCheckoutStart: setting.allow_checkout_start,
+        latePointPenaltyPerMinute: normalizeLatePointPenaltyPerMinute(
+          setting.late_point_penalty_per_minute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
+        ),
+        absentPointPenaltyPerDay: normalizeAbsentPointPenaltyPerDay(
+          setting.absent_point_penalty_per_day ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
+        ),
         workDays: typeof setting.work_days === 'string' ? JSON.parse(setting.work_days) : setting.work_days,
         officeLocation: legacyOfficePin ? {
           ...officeLocation,
@@ -209,29 +287,68 @@ appDataRouter.get('/hall-of-fame/trainees', authenticateToken, async (req: Authe
   }
 
   try {
-    const [rows] = await getPool().query<any[]>(`
-      SELECT u.id, u.nim, u.name, u.avatar, u.kejuruan_id, u.kejuruan_name,
-             COUNT(s.id) AS completed_missions_count,
-             COALESCE(SUM(s.points), 0) AS total_points
-      FROM users u
-      LEFT JOIN mission_submissions s ON s.trainee_id = u.id AND s.status = 'approved'
-      WHERE u.role = 'trainee'
-      GROUP BY u.id, u.nim, u.name, u.avatar, u.kejuruan_id, u.kejuruan_name
-      ORDER BY total_points DESC, completed_missions_count DESC, u.name ASC
-    `);
-    return res.json({
-      success: true,
-      trainees: rows.map((row: any) => ({
+    const pool = getPool();
+    const [settingRows] = await pool.query<any[]>(
+      'SELECT * FROM attendance_settings ORDER BY updated_at DESC LIMIT 1'
+    );
+    const setting = settingRows[0];
+    const workDays = parseWorkDays(setting);
+    const absentPointPenaltyPerDay = normalizeAbsentPointPenaltyPerDay(setting?.absent_point_penalty_per_day);
+
+    const [rows] = await pool.query<any[]>(`
+        SELECT u.id, u.nim, u.name, u.avatar, u.kejuruan_id, u.kejuruan_name, u.joined_date,
+               COALESCE(submission_stats.completed_missions_count, 0) AS completed_missions_count,
+               COALESCE(submission_stats.total_points, 0) AS approved_points,
+               COALESCE(late_penalties.total_penalty, 0) AS total_late_penalty
+        FROM users u
+        LEFT JOIN (
+          SELECT trainee_id, COUNT(*) AS completed_missions_count, COALESCE(SUM(points), 0) AS total_points
+          FROM mission_submissions
+          WHERE status = 'approved'
+          GROUP BY trainee_id
+        ) submission_stats ON submission_stats.trainee_id = u.id
+        LEFT JOIN (
+          SELECT user_id, COALESCE(SUM(late_penalty_points), 0) AS total_penalty
+          FROM attendance_records
+          WHERE late_penalty_points > 0
+          GROUP BY user_id
+        ) late_penalties ON late_penalties.user_id = u.id
+        WHERE u.role = 'trainee'
+      `);
+    const exemptByUser = await buildExemptDates();
+
+    const trainees = rows.map((row: any) => {
+      const latePenaltyPoints = Number(row.total_late_penalty || 0);
+      const absent = computeAbsentPenalty({
+        workDays,
+        absentPointPenaltyPerDay,
+        today: todayWib(),
+        joinedDate: row.joined_date,
+        attendedOrLeaveDates: exemptByUser.get(String(row.id)) || [],
+      });
+      const approvedPoints = Number(row.approved_points || 0);
+      return {
         id: row.id,
         nim: row.nim,
         name: row.name,
         avatar: row.avatar || '',
         kejuruanId: row.kejuruan_id || undefined,
         kejuruanName: row.kejuruan_name || undefined,
-        totalPoints: Number(row.total_points),
+        totalPoints: Math.max(0, approvedPoints - latePenaltyPoints - absent.absentPenaltyPoints),
+        latePenaltyPoints,
+        absentPenaltyPoints: absent.absentPenaltyPoints,
+        absentDays: absent.absentDays,
         completedMissionsCount: Number(row.completed_missions_count),
-      })),
+      };
     });
+
+    trainees.sort((a, b) =>
+      b.totalPoints - a.totalPoints ||
+      b.completedMissionsCount - a.completedMissionsCount ||
+      String(a.name).localeCompare(String(b.name))
+    );
+
+    return res.json({ success: true, trainees });
   } catch (error: any) {
     console.error('[Trainee Hall of Fame Error]', error);
     return res.status(500).json({ success: false, message: 'Gagal memuat peringkat peserta.' });
@@ -348,6 +465,8 @@ appDataRouter.put('/settings', authenticateToken, async (req: AuthenticatedReque
   const lat = Number(location.lat);
   const lng = Number(location.lng);
   const radiusMeters = Number(location.radiusMeters);
+  const latePointPenaltyPerMinute = Number(settings.latePointPenaltyPerMinute);
+  const absentPointPenaltyPerDay = Number(settings.absentPointPenaltyPerDay);
   if (
     typeof settings.startTime !== 'string' || !settings.startTime ||
     typeof settings.lateLimitTime !== 'string' || !settings.lateLimitTime ||
@@ -360,16 +479,25 @@ appDataRouter.put('/settings', authenticateToken, async (req: AuthenticatedReque
   ) {
     return res.status(400).json({ success: false, message: 'Pengaturan jam atau koordinat lokasi tidak valid.' });
   }
+  if (!Number.isInteger(latePointPenaltyPerMinute) || latePointPenaltyPerMinute < 0 || latePointPenaltyPerMinute > 500) {
+    return res.status(400).json({ success: false, message: 'Poin pengurangan per menit keterlambatan harus bilangan bulat 0-500.' });
+  }
+  if (!Number.isInteger(absentPointPenaltyPerDay) || absentPointPenaltyPerDay < 0 || absentPointPenaltyPerDay > 500) {
+    return res.status(400).json({ success: false, message: 'Poin pengurangan per hari tidak absen harus bilangan bulat 0-500.' });
+  }
 
   try {
     await getPool().query(
-      `INSERT INTO attendance_settings (id,start_time,late_limit_time,end_time,allow_checkout_start,work_days,office_location,updated_by)
-       VALUES ('global',?,?,?,?,?,?,?)
+      `INSERT INTO attendance_settings (id,start_time,late_limit_time,end_time,allow_checkout_start,work_days,office_location,late_point_penalty_per_minute,absent_point_penalty_per_day,updated_by)
+       VALUES ('global',?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE start_time=VALUES(start_time),late_limit_time=VALUES(late_limit_time),
        end_time=VALUES(end_time),allow_checkout_start=VALUES(allow_checkout_start),work_days=VALUES(work_days),
-       office_location=VALUES(office_location),updated_by=VALUES(updated_by)`,
+       office_location=VALUES(office_location),late_point_penalty_per_minute=VALUES(late_point_penalty_per_minute),
+       absent_point_penalty_per_day=VALUES(absent_point_penalty_per_day),
+       updated_by=VALUES(updated_by)`,
       [settings.startTime, settings.lateLimitTime, settings.endTime, settings.allowCheckoutStart,
-        JSON.stringify(settings.workDays), JSON.stringify({ ...location, lat, lng, radiusMeters }), req.user.id]
+        JSON.stringify(settings.workDays), JSON.stringify({ ...location, lat, lng, radiusMeters }),
+        latePointPenaltyPerMinute, absentPointPenaltyPerDay, req.user.id]
     );
     return res.json({ success: true, message: 'Pengaturan lokasi presensi berhasil disimpan.' });
   } catch (error: any) {
@@ -439,6 +567,14 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
       [target.id, date]
     );
     const existingRecord = existingRows[0];
+    // Penalti keterlambatan memakai check-in efektif (request ini atau yang sudah
+    // tersimpan) supaya retry tidak menghitung poin dua kali.
+    const penaltySettings = await loadPenaltySettings();
+    const latePenalty = computeLatePenalty(penaltySettings, {
+      role: target.role,
+      status: input.status,
+      checkInTime: checkInTime || existingRecord?.check_in_time || null,
+    });
     // A retry or stale browser state must never replace the original check-in
     // time or agenda. Return the persisted row as the source of truth.
     if (existingRecord && target.id === user.id && checkInTime && !checkOutTime && existingRecord.check_in_time) {
@@ -459,8 +595,8 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
       `INSERT INTO attendance_records (
         id,user_id,user_name,user_nim,user_role,kejuruan_id,kejuruan_name,attendance_date,
         check_in_time,check_out_time,status,verification_status,verified_by,verified_at,
-        location,latitude,longitude,notes,photo_url,rejection_reason,work_mode
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        location,latitude,longitude,notes,photo_url,rejection_reason,work_mode,late_minutes,late_penalty_points
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON DUPLICATE KEY UPDATE
         notes=${protectExistingCheckIn ? 'IF(check_in_time IS NULL,VALUES(notes),notes)' : 'VALUES(notes)'},
         work_mode=${protectExistingCheckIn ? 'IF(check_in_time IS NULL,COALESCE(VALUES(work_mode),work_mode),COALESCE(work_mode,VALUES(work_mode)))' : 'COALESCE(VALUES(work_mode),work_mode)'},
@@ -468,6 +604,7 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
         check_out_time=COALESCE(VALUES(check_out_time),check_out_time),
         status=VALUES(status),location=VALUES(location),latitude=VALUES(latitude),
         longitude=VALUES(longitude),photo_url=VALUES(photo_url),
+        late_minutes=VALUES(late_minutes),late_penalty_points=VALUES(late_penalty_points),
         verification_status=IF(?,VALUES(verification_status),verification_status),
         verified_by=IF(?,VALUES(verified_by),verified_by),verified_at=IF(?,VALUES(verified_at),verified_at),
         rejection_reason=IF(?,VALUES(rejection_reason),rejection_reason)`,
@@ -476,6 +613,7 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
         checkInTime,checkOutTime,input.status,verificationStatus,verifiedBy,verifiedAt,
         input.location || null,coordinates.lat ?? null,coordinates.lng ?? null,input.notes || null,input.photoUrl || null,
         isReview ? input.rejectionReason || null : null,input.workMode === 'WFH' ? 'WFH' : input.workMode === 'WFO' ? 'WFO' : null,
+        latePenalty.lateMinutes, latePenalty.latePenaltyPoints,
         canWriteReview,canWriteReview,canWriteReview,canWriteReview,
       ]
     );
@@ -631,13 +769,21 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
       `INSERT INTO kejuruan (id,name,code,category,color,description,mentor_id,mentor_name) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),code=VALUES(code),category=VALUES(category),color=VALUES(color),description=VALUES(description),mentor_id=VALUES(mentor_id),mentor_name=VALUES(mentor_name)`,
       [r.id,r.name,canonicalKejuruanCode(r.name, r.code),r.category,r.color,r.description || '',r.mentorId || null,r.mentorName || null]);
 
+    const penaltySettings = await loadPenaltySettings();
     for (const r of lists.attendanceRecords) {
       if (user.role === 'trainee' && !own(r)) continue;
       const reviewUpdate = user.role === 'trainee'
-        ? 'user_name=VALUES(user_name),user_nim=VALUES(user_nim),check_in_time=VALUES(check_in_time),check_out_time=VALUES(check_out_time),work_mode=COALESCE(VALUES(work_mode),work_mode),status=VALUES(status),location=VALUES(location),latitude=VALUES(latitude),longitude=VALUES(longitude),notes=VALUES(notes),photo_url=VALUES(photo_url)'
-        : 'user_name=VALUES(user_name),user_nim=VALUES(user_nim),user_role=VALUES(user_role),kejuruan_id=VALUES(kejuruan_id),kejuruan_name=VALUES(kejuruan_name),attendance_date=VALUES(attendance_date),check_in_time=VALUES(check_in_time),check_out_time=VALUES(check_out_time),work_mode=COALESCE(VALUES(work_mode),work_mode),status=VALUES(status),verification_status=VALUES(verification_status),verified_by=VALUES(verified_by),verified_at=VALUES(verified_at),location=VALUES(location),latitude=VALUES(latitude),longitude=VALUES(longitude),notes=VALUES(notes),photo_url=VALUES(photo_url),rejection_reason=VALUES(rejection_reason)';
-      await upsert(`INSERT INTO attendance_records (id,user_id,user_name,user_nim,user_role,kejuruan_id,kejuruan_name,attendance_date,check_in_time,check_out_time,status,verification_status,verified_by,verified_at,location,latitude,longitude,notes,photo_url,rejection_reason,work_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ${reviewUpdate}`,
-      [r.id,r.userId,r.userName,r.userNim,r.userRole || 'trainee',r.kejuruanId || null,r.kejuruanName || null,dateValue(r.date),r.checkInTime || null,r.checkOutTime || null,r.status,user.role === 'trainee' ? 'pending' : r.verificationStatus,user.role === 'trainee' ? null : r.verifiedBy || null,user.role === 'trainee' ? null : dateTimeValue(r.verifiedAt),r.location || null,r.coordinates?.lat ?? null,r.coordinates?.lng ?? null,r.notes || null,r.photoUrl || null,user.role === 'trainee' ? null : r.rejectionReason || null,r.workMode === 'WFH' ? 'WFH' : r.workMode === 'WFO' ? 'WFO' : null]);
+        ? 'user_name=VALUES(user_name),user_nim=VALUES(user_nim),check_in_time=VALUES(check_in_time),check_out_time=VALUES(check_out_time),work_mode=COALESCE(VALUES(work_mode),work_mode),status=VALUES(status),location=VALUES(location),latitude=VALUES(latitude),longitude=VALUES(longitude),notes=VALUES(notes),photo_url=VALUES(photo_url),late_minutes=VALUES(late_minutes),late_penalty_points=VALUES(late_penalty_points)'
+        : 'user_name=VALUES(user_name),user_nim=VALUES(user_nim),user_role=VALUES(user_role),kejuruan_id=VALUES(kejuruan_id),kejuruan_name=VALUES(kejuruan_name),attendance_date=VALUES(attendance_date),check_in_time=VALUES(check_in_time),check_out_time=VALUES(check_out_time),work_mode=COALESCE(VALUES(work_mode),work_mode),status=VALUES(status),verification_status=VALUES(verification_status),verified_by=VALUES(verified_by),verified_at=VALUES(verified_at),location=VALUES(location),latitude=VALUES(latitude),longitude=VALUES(longitude),notes=VALUES(notes),photo_url=VALUES(photo_url),rejection_reason=VALUES(rejection_reason),late_minutes=VALUES(late_minutes),late_penalty_points=VALUES(late_penalty_points)';
+      // Selalu hitung ulang penalti di server dari status + jam check-in yang
+      // tersimpan, sehingga tarif terbaru dari admin langsung berlaku.
+      const latePenalty = computeLatePenalty(penaltySettings, {
+        role: r.userRole || 'trainee',
+        status: r.status,
+        checkInTime: r.checkInTime || null,
+      });
+      await upsert(`INSERT INTO attendance_records (id,user_id,user_name,user_nim,user_role,kejuruan_id,kejuruan_name,attendance_date,check_in_time,check_out_time,status,verification_status,verified_by,verified_at,location,latitude,longitude,notes,photo_url,rejection_reason,work_mode,late_minutes,late_penalty_points) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ${reviewUpdate}`,
+      [r.id,r.userId,r.userName,r.userNim,r.userRole || 'trainee',r.kejuruanId || null,r.kejuruanName || null,dateValue(r.date),r.checkInTime || null,r.checkOutTime || null,r.status,user.role === 'trainee' ? 'pending' : r.verificationStatus,user.role === 'trainee' ? null : r.verifiedBy || null,user.role === 'trainee' ? null : dateTimeValue(r.verifiedAt),r.location || null,r.coordinates?.lat ?? null,r.coordinates?.lng ?? null,r.notes || null,r.photoUrl || null,user.role === 'trainee' ? null : r.rejectionReason || null,r.workMode === 'WFH' ? 'WFH' : r.workMode === 'WFO' ? 'WFO' : null,latePenalty.lateMinutes,latePenalty.latePenaltyPoints]);
     }
 
     for (const r of lists.leaveRequests) {
