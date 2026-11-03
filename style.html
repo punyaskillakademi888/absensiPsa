@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="id"><head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20260924-01-c908df1","C":{"Abril Fatface":"YACgEZbkUVE,0","Alfa Slab One":"YACgEYS9sJU,0","Anton":"YACgEcYqQ-A,0","Archivo":"YACgEZulLoA,0","Arial Narrow":"YAGyDvJ_4Ts,0","Arial Rounded MT Bold":"YAFcfoaHu-s,0","Arial":"YAGyDvJ_4Ts,0","Avenir Next":"YAFcfmNq6UY,0","Baloo 2":"YADK30bC6HQ,0","Bebas Neue":"YACgESME5ew,0","Bricolage Grotesque":"YAFyMcdwzpc,0","Broken Glyph":"YADZ-exUkv0,0","Canva Sans":"YAFdJjTk5UU,1","Caveat":"YALBs2ploWQ,0","Comic Sans MS":"YAFcfvtOAUY,1","Cormorant Garamond":"YAFdJhX-538,0","Courier New":"YAGzXiGs0_8,0","Courier Prime":"YAD1aFjegN8,0","DM Sans":"YAD1aU3sLnI,0","DM Serif Display":"YAD1aYG82rc,0","Forum":"YACgEcnnqB4,0","Fraunces":"YAFdJpU7Kkk,0","Georgia":"YAGzXkO0pEM,0","Ghost Mono":"YAHQutsX00Q,0","Hanken Grotesk":"YAFcfhwp99E,0","Helvetica Neue":"YAFcf6CtJfI,0","Helvetica":"YAFcf6CtJfI,0","IBM Plex Mono":"YAFdJkmvhGI,0","Impact":"YAFcfnjI7Vk,0","Instrument Serif":"YAHFeOnZNEk,0","Inter":"YAFdJvSyp_k,3","Iowan Old Style":"YAGNIFa8j9o,0","Jacques Francois":"YADK3zbC6RM,0","JetBrains Mono":"YAFdJksXcAk,0","Josefin Sans":"YAFdJjvw9Ps,0","Lato":"YAFdJuFCnaw,0","Libre Baskerville":"YACgEUFdPdA,0","Lobster":"YAD8SnSjSFI,0","Lora":"YACgEXvxf8Q,0","Merriweather":"YACgEXvHxxs,0","Montserrat":"YAFdtQi73Xs,0","Nunito":"YAFdJoNRMmU,1","Oleo Script":"YACgEQQ14jI,0","Oswald":"YACgEQY10lw,0","Pacifico":"YADLjORQ1u4,0","Phantom Sans":"YAFdJvgJ5TU,0","Playfair Display":"YAFdJhem5V8,1","Plus Jakarta Sans":"YAGvf3_u0_Q,0","Poppins":"YAFdJjbTu24,1","Press Start 2P":"YAFyGr-8pmQ,0","Quicksand":"YAFdJpYtCxE,1","Raleway":"YAFdJhmxbVQ,1","Roboto Slab":"YAFdJswIKAg,0","Rockwell":"YAFcfyVZnN0,0","Rye":"YACgEdQP21k,0","Segoe UI":"YAHNdRD1Klw,0","Source Sans 3":"YAG4lO1Mj10,0","Source Serif 4":"YACgEfdj394,0","Space Grotesk":"YADZ-dYEmhg,0","Space Mono":"YADW1-vpsoc,0","Times New Roman":"YAGzXW3gftg,0","Times":"YAGzXW3gftg,0","Trebuchet MS":"YAFcfrglpVA,0","UV Display":"YAEdVfSSpYo,0","UV Sans":"YAFdJvgJ5TU,0","Ubuntu":"YACgERDU--Q,0","Verdana":"YAGzXTctYtQ,0","Work Sans":"YAGXhLOKv44,0","Yellowtail":"YACgEYG4kG4,0","ui-monospace":"YAD1aFjegN8,0","ui-sans-serif":"YACkoD1yZN0,0"}}');</script><script src="/_sdk/83d6dfdadcd4750a.telemetry_sdk.js" integrity="sha512-XS4Dvzp6vbagZS9vFErihvr8aO3S0tH78KWUefn06fmL4WYqryBtZj/IOLITYj7dFA4gPVvPg1W/JB1DK3uLNQ=="></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presensi Magang Harian</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --navy:#123B59; --deep:#0D2F47; --blue:#4C83B5; --pale:#A9C7DE;
+      --canvas:#F4F6F8; --line:#E4EAF0; --muted:#6F7F8D; --pink:#D95B83;
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:"DM Sans",sans-serif;color:var(--navy)}
+    button,input,textarea,select{font:inherit} button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid rgba(76,131,181,.32);outline-offset:3px}
+    .app-shell{width:100%;min-height:calc(100 * min(var(--vh,1vh),1vh));background:var(--canvas)}
+    .desktop-sidebar{position:fixed;left:20px;top:20px;bottom:20px;width:252px;background:var(--navy);border-radius:20px;box-shadow:0 18px 42px rgba(13,47,71,.17)}
+    .workspace{width:100%;padding:26px 28px 36px 302px}.view{display:none;animation:enter .28s ease both}.view.is-active{display:block}
+    @keyframes enter{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+    .surface{background:#fff;border:1px solid var(--line);box-shadow:0 7px 20px rgba(18,59,89,.045)}
+    .side-nav-item{color:rgba(255,255,255,.7);transition:.18s}.side-nav-item:hover{background:rgba(255,255,255,.09);color:#fff}.side-nav-item.is-active{background:rgba(169,199,222,.2);color:#fff}.side-nav-item.is-active .side-icon{color:#A9C7DE}
+    .mobile-nav-item.is-active{color:var(--blue)}.mobile-nav-item.is-active .mobile-icon{background:#EAF2F8}
+    .metric-card{min-height:138px}.calendar-cell{min-height:42px}.calendar-cell.today{box-shadow:inset 0 0 0 2px var(--blue)}
+    .toast{opacity:0;transform:translate(-50%,120%);transition:.24s}.toast.show{opacity:1;transform:translate(-50%,0)}
+    .modal-layer{display:none}.modal-layer.show{display:flex}.timeline-line{position:absolute;left:12px;top:26px;bottom:25px;width:1px;background:#DCE7EF}
+    .logo-shield{width:42px;height:48px;flex:none}.brand-punya{font-size:21px;font-weight:700;line-height:.8;letter-spacing:-.06em}.brand-skill{font-size:12px;letter-spacing:.27em;color:#A9C7DE;font-weight:500}
+    .brand-skill b{color:var(--pink)}.soft-hover{transition:transform .18s ease,box-shadow .18s ease}.soft-hover:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(18,59,89,.09)}
+    @media(max-width:1023px){.desktop-sidebar{display:none}.workspace{padding:16px 16px 94px}.desktop-hide{display:none!important}}
+    @media(min-width:1024px){.mobile-only{display:none!important}}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.577.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <script src="/_sdk/8de366929c5f3b48.data_sdk.js" type="text/javascript" integrity="sha512-TyQ8k8cZj66xe/aENmn6RyZpdOFZXbAo5+KBG3PeFM+Q4qMTHU8xAqmq4ADClNfPrstgQYV6OzZHwLTnElzB2g=="></script>
+  <script src="/_sdk/c90249f316bbe621.editing_sdk.js" type="text/javascript" integrity="sha512-cd4ICwG+3hl1AqLrCysr9GopLZ+2Cyjo2KMofj11Ys31LqLmkNEJhOQqYCwg6Nakgg+jlZ2JIdhM6PxWUR0zsg=="></script>
+  <script src="/_sdk/765e1fea0cec97ce.resizing_sdk.js" type="text/javascript" integrity="sha512-IRTJnqww0+HQ5V/LlWEQrlD5SrYHaVvaeVoNe8HYQXoaguzUGheSd9+n9s6WOgaTcEH0g37DuINHZ9aqfzWjlw=="></script>
+ </head>
+ <body data-template-id="__page-root" class="app-shell" style="background: rgb(244, 246, 248);">
+  <aside data-template-id="desktop-sidebar" class="canva-sidebar desktop-sidebar hidden lg:flex flex-col p-5" aria-label="Navigasi utama" style="background: rgb(18, 59, 89);">
+   <div class="flex items-center gap-3 px-1">
+    <svg class="logo-shield" viewBox="0 0 50 58" aria-label="Emblem Punya Skill Academy" role="img"><path d="M4 3h42v32c0 10-9 16-21 21C13 51 4 45 4 35V3Z" fill="#fff"></path> <path d="M6 5h38v29c0 9-8 14-19 19C14 48 6 43 6 34V5Z" fill="#0D2F47"></path> <path d="M10 29h30v5c-3 7-8 10-15 14-7-4-12-7-15-14v-5Z" fill="#fff"></path> <path d="M16 15c4-3 7 1 9 3 2-2 5-6 9-3v8c-3-2-6-2-9 0-3-2-6-2-9 0v-8Z" fill="#fff"></path> <path d="M15 38c3 0 4 4 6 4 2 0 2-7 4-7s2 7 4 7c2 0 3-4 6-4" fill="none" stroke="#0D2F47" stroke-width="2"></path>
+    </svg>
+    <div>
+     <div class="brand-punya">
+      punya
+     </div>
+     <div class="brand-skill">
+      SK<b>I</b>LL
+     </div>
+    </div>
+   </div>
+   <p data-template-id="sidebar-caption" class="canva-text mt-4 px-1 text-[10px] font-bold tracking-[.16em] text-white/45" style="color: rgb(169, 199, 222); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.12rem;">PRESENSI MAGANG HARIAN</p>
+   <section class="mt-6 rounded-2xl border border-white/10 bg-white/[.07] p-3.5">
+    <div class="flex items-center gap-3">
+     <div id="sidebar-initial" class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#4C83B5] font-bold text-white">
+      A
+     </div>
+     <div class="min-w-0">
+      <p id="sidebar-name" class="truncate text-sm font-bold text-white"></p>
+      <p id="sidebar-batch" class="truncate text-xs text-white/55"></p>
+     </div>
+    </div>
+    <div class="mt-3 flex items-center justify-between border-t border-white/10 pt-3"><span data-template-id="sidebar-role-label" class="canva-text text-[9px] font-bold tracking-[.13em] text-white/45" style="color: rgb(169, 199, 222); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.08rem;">PERAN AKTIF</span> <span id="sidebar-role" class="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-white"></span>
+    </div>
+   </section>
+   <nav class="mt-6 space-y-1.5" aria-label="Menu dashboard"><button type="button" class="side-nav-item is-active flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold" data-view-target="dashboard-view"><i data-lucide="layout-dashboard" class="side-icon h-4 w-4"></i><span data-template-id="nav-dashboard-side" class="canva-text" style="color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Dashboard</span></button> <button type="button" class="side-nav-item flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold" data-view-target="history-view"><i data-lucide="history" class="side-icon h-4 w-4"></i><span data-template-id="nav-history-side" class="canva-text" style="color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Riwayat</span></button> <button type="button" class="side-nav-item flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold" data-view-target="leave-view"><i data-lucide="calendar-clock" class="side-icon h-4 w-4"></i><span data-template-id="nav-leave-side" class="canva-text" style="color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Izin</span></button> <button type="button" class="side-nav-item flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold" data-view-target="profile-view"><i data-lucide="user-round" class="side-icon h-4 w-4"></i><span data-template-id="nav-profile-side" class="canva-text" style="color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Profil</span></button> <button id="admin-nav" type="button" class="side-nav-item hidden w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold" data-view-target="profile-view"><i data-lucide="shield-check" class="side-icon h-4 w-4"></i><span data-template-id="nav-admin-side" class="canva-text" style="color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Admin</span></button>
+   </nav>
+   <div class="mt-auto rounded-xl border border-white/10 bg-[#0D2F47] p-4">
+    <div class="flex gap-2.5">
+     <i data-lucide="map-pin" class="mt-0.5 h-4 w-4 shrink-0 text-[#A9C7DE]"></i>
+     <div>
+      <p data-template-id="sidebar-tip-title" class="canva-text text-xs font-bold text-white" style="color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Presensi lebih mudah</p>
+      <p data-template-id="sidebar-tip-copy" class="canva-text mt-1 text-[11px] leading-relaxed text-white/55" style="color: rgb(169, 199, 222); font-weight: 400; font-style: normal; font-size: 16px;">Pastikan lokasi aktif sebelum melakukan check-in atau check-out.</p>
+     </div>
+    </div>
+   </div>
+  </aside>
+  <div class="workspace">
+   <header class="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+    <div class="flex items-center gap-3 lg:block">
+     <div class="mobile-only flex items-center gap-2">
+      <svg class="h-9 w-8" viewBox="0 0 50 58" aria-hidden="true">
+       <path d="M4 3h42v32c0 10-9 16-21 21C13 51 4 45 4 35V3Z" fill="#123B59"></path><path d="M16 15c4-3 7 1 9 3 2-2 5-6 9-3v8c-3-2-6-2-9 0-3-2-6-2-9 0v-8Z" fill="#fff"></path>
+      </svg><span class="font-bold tracking-tight text-[#123B59]">punya <span class="font-medium text-[#4C83B5]">SK<span class="text-[#D95B83]">I</span>LL</span></span>
+     </div>
+     <div>
+      <p data-template-id="header-overline" class="canva-text text-[10px] font-bold tracking-[.14em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">PRESENSI MAGANG HARIAN</p>
+      <h1 data-template-id="app-title" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 32px;">Selamat datang kembali</h1>
+      <p id="header-date" class="mt-1 text-sm text-[#6F7F8D]"></p>
+     </div>
+    </div>
+    <div class="surface flex items-center gap-3 rounded-2xl px-3.5 py-2.5"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2F8] text-[#4C83B5]"><i data-lucide="clock-3" class="h-4 w-4"></i></span>
+     <div class="pr-2">
+      <p data-template-id="header-clock-label" class="canva-text text-[9px] font-bold tracking-[.1em]" style="color: rgb(111, 127, 141); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.08rem;">WAKTU SAAT INI</p>
+      <p id="live-clock" class="text-base font-bold text-[#123B59]">00.00.00</p>
+     </div><label for="role-switch" class="sr-only">Mode tampilan</label><select id="role-switch" class="rounded-xl border border-[#E4EAF0] bg-[#F4F6F8] px-2.5 py-2 text-xs font-semibold text-[#123B59]"><option value="participant">Peserta</option><option value="admin">Admin demo</option></select>
+    </div>
+   </header>
+   <main>
+    <section id="dashboard-view" class="view is-active" aria-labelledby="dashboard-title">
+     <h2 id="dashboard-title" class="sr-only">Dashboard Presensi</h2>
+     <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <article data-template-id="present-summary-card" class="canva-card metric-card soft-hover rounded-2xl border p-4" style="background: rgb(255, 255, 255);">
+       <div class="flex items-center justify-between">
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#4C83B5]"><i data-lucide="circle-check" class="h-4 w-4"></i></span><span class="text-[10px] font-bold text-[#4C83B5]">BULAN INI</span>
+       </div>
+       <p id="present-count" class="mt-5 text-3xl font-bold text-[#123B59]">0</p>
+       <p data-template-id="present-summary-label" class="canva-text mt-1 text-xs font-bold" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px;">Hadir</p>
+      </article>
+      <article data-template-id="leave-summary-card" class="canva-card metric-card soft-hover rounded-2xl border p-4" style="background: rgb(255, 255, 255);">
+       <div class="flex items-center justify-between">
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#4C83B5]"><i data-lucide="calendar-clock" class="h-4 w-4"></i></span><span class="text-[10px] font-bold text-[#6F7F8D]">BULAN INI</span>
+       </div>
+       <p id="leave-count" class="mt-5 text-3xl font-bold text-[#123B59]">0</p>
+       <p data-template-id="leave-summary-label" class="canva-text mt-1 text-xs font-bold" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px;">Izin</p>
+      </article>
+      <article data-template-id="alpha-summary-card" class="canva-card metric-card soft-hover rounded-2xl border p-4" style="background: rgb(255, 255, 255);">
+       <div class="flex items-center justify-between">
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#D95B83]"><i data-lucide="circle-x" class="h-4 w-4"></i></span><span class="text-[10px] font-bold text-[#6F7F8D]">BULAN INI</span>
+       </div>
+       <p id="alpha-count" class="mt-5 text-3xl font-bold text-[#123B59]">0</p>
+       <p data-template-id="alpha-summary-label" class="canva-text mt-1 text-xs font-bold" style="color: rgb(217, 91, 131); font-weight: 700; font-style: normal; font-size: 16px;">Alpha</p>
+      </article>
+     </section>
+     <div class="mt-5 grid gap-5 xl:grid-cols-12">
+      <section data-template-id="today-status-card" class="canva-card surface soft-hover overflow-hidden rounded-2xl p-5 sm:p-6 xl:col-span-7" style="background: rgb(255, 255, 255);">
+       <div class="flex items-start justify-between gap-4">
+        <div>
+         <p data-template-id="today-label" class="canva-text text-[10px] font-bold tracking-[.13em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">PRESENSI HARI INI</p>
+         <div class="mt-3 flex flex-wrap items-center gap-2">
+          <h2 id="today-status-text" class="text-2xl font-bold text-[#123B59]">Memuat status...</h2><span id="today-status-chip" class="rounded-full px-2.5 py-1 text-[10px] font-bold"></span>
+         </div>
+         <p id="today-status-helper" class="mt-2 max-w-lg text-sm leading-relaxed text-[#6F7F8D]"></p>
+        </div><span id="status-orb" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#EAF2F8] text-[#4C83B5]"><i data-lucide="clock-3" class="h-5 w-5"></i></span>
+       </div>
+       <div class="mt-5 grid gap-3 rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] p-4 sm:grid-cols-2">
+        <div>
+         <p data-template-id="clock-label" class="canva-text text-[9px] font-bold tracking-[.11em]" style="color: rgb(111, 127, 141); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.08rem;">TANGGAL PRESENSI</p>
+         <p id="today-date" class="mt-1 text-sm font-bold text-[#123B59]"></p>
+        </div>
+        <div class="sm:text-right">
+         <p class="text-[9px] font-bold tracking-[.11em] text-[#6F7F8D]">STATUS LOKASI</p>
+         <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold text-[#4C83B5] sm:justify-end"><span class="h-2 w-2 rounded-full bg-[#4C83B5]"></span><span data-template-id="gps-helper" class="canva-text" style="color: rgb(76, 131, 181); font-weight: 500; font-style: normal; font-size: 16px;">GPS diperlukan untuk presensi</span></p>
+        </div>
+       </div>
+       <div id="attendance-feedback" class="hidden mt-4 rounded-xl border border-[#C8DCEB] bg-[#EEF6FB] px-4 py-3" aria-live="polite">
+        <div class="flex items-center gap-3">
+         <span class="flex h-7 w-7 items-center justify-center rounded-full bg-[#4C83B5] text-white"><i data-lucide="check" class="h-4 w-4"></i></span>
+         <p id="attendance-feedback-text" class="text-sm font-bold text-[#123B59]"></p>
+        </div>
+       </div>
+       <div id="location-error" class="hidden mt-4 rounded-xl border border-[#E3C4D0] bg-[#FCF3F6] p-4" aria-live="polite">
+        <p data-template-id="location-error-text" class="canva-text text-sm font-bold" style="color: rgb(217, 91, 131); font-weight: 700; font-style: normal; font-size: 16px;">Lokasi belum terdeteksi, coba lagi</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+         <button id="retry-location" data-template-id="retry-location-button" type="button" class="canva-button rounded-xl px-4 py-2 text-sm font-bold" style="background: rgb(18, 59, 89); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Coba lagi</button><button id="demo-location" data-template-id="demo-location-button" type="button" class="canva-button rounded-xl border px-4 py-2 text-sm font-bold" style="background: rgb(255, 255, 255); color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Gunakan lokasi demo</button>
+        </div>
+       </div><button id="attendance-action" data-template-id="attendance-button" type="button" class="canva-button mt-5 flex w-full items-center justify-center gap-3 rounded-xl px-5 py-4 font-bold transition hover:-translate-y-0.5 disabled:cursor-not-allowed" style="background: rgb(18, 59, 89); color: rgb(255, 255, 255); font-weight: 700;"><i id="attendance-icon" data-lucide="log-in" class="h-5 w-5"></i><span id="attendance-button-text">Check-in</span><span class="ml-1 h-1.5 w-1.5 rounded-full bg-[#D95B83]"></span></button>
+       <p id="attendance-loading" class="hidden mt-3 text-center text-sm font-semibold text-[#4C83B5]" aria-live="polite"></p>
+      </section>
+      <aside data-template-id="activity-card" class="canva-panel surface soft-hover rounded-2xl p-5 xl:col-span-5" aria-labelledby="activity-heading" style="background: rgb(255, 255, 255);">
+       <div class="flex items-start justify-between">
+        <div>
+         <p data-template-id="activity-overline" class="canva-text text-[10px] font-bold tracking-[.13em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">AKTIVITAS HARI INI</p>
+         <h2 id="activity-heading" data-template-id="activity-heading-text" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 22px;">Ringkasan presensi</h2>
+        </div><span id="activity-state" class="rounded-full px-2.5 py-1 text-[10px] font-bold"></span>
+       </div>
+       <div class="relative mt-5">
+        <div class="timeline-line"></div>
+        <div class="relative flex gap-3 pb-6">
+         <span id="checkin-dot" class="z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#EAF2F8] text-[#4C83B5]"><i data-lucide="log-in" class="h-3.5 w-3.5"></i></span>
+         <div>
+          <p data-template-id="checkin-label" class="canva-text text-[10px] font-bold tracking-[.08em]" style="color: rgb(111, 127, 141); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.06rem;">CHECK-IN</p>
+          <p id="activity-checkin-time" class="mt-1 text-sm font-bold text-[#123B59]">Belum tercatat</p>
+          <p id="activity-checkin-location" class="mt-1 text-xs text-[#6F7F8D]">Lokasi akan muncul setelah presensi.</p>
+         </div>
+        </div>
+        <div class="relative flex gap-3">
+         <span id="checkout-dot" class="z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#F4F6F8] text-[#6F7F8D]"><i data-lucide="log-out" class="h-3.5 w-3.5"></i></span>
+         <div>
+          <p data-template-id="checkout-label" class="canva-text text-[10px] font-bold tracking-[.08em]" style="color: rgb(111, 127, 141); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.06rem;">CHECK-OUT</p>
+          <p id="activity-checkout-time" class="mt-1 text-sm font-bold text-[#123B59]">Menunggu check-out</p>
+          <p data-template-id="checkout-helper" class="canva-text mt-1 text-xs text-[#6F7F8D]" style="color: rgb(111, 127, 141); font-weight: 400; font-style: normal; font-size: 16px;">Lakukan check-out saat aktivitas selesai.</p>
+         </div>
+        </div>
+       </div>
+      </aside>
+      <section data-template-id="mini-calendar-card" class="canva-card surface rounded-2xl p-5 xl:col-span-7" aria-labelledby="mini-calendar-title" style="background: rgb(255, 255, 255);">
+       <div class="flex items-center justify-between">
+        <div>
+         <p data-template-id="calendar-overline" class="canva-text text-[10px] font-bold tracking-[.13em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">REKAP BULANAN</p>
+         <h2 id="mini-calendar-title" data-template-id="mini-calendar-heading" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 24px;">Kalender kehadiran</h2>
+        </div><span id="mini-calendar-month" class="rounded-full bg-[#F4F6F8] px-3 py-1.5 text-xs font-semibold text-[#6F7F8D]"></span>
+       </div>
+       <div class="mt-5 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#6F7F8D]">
+        <span>Sn</span><span>Sl</span><span>Sa</span><span>Ra</span><span>Ka</span><span>Ju</span><span>Sa</span>
+       </div>
+       <div id="mini-calendar" class="mt-2 grid grid-cols-7 gap-1"></div>
+       <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-medium text-[#6F7F8D]">
+        <span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-[#4C83B5]"></i>Hadir</span><span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-[#A9C7DE]"></i>Izin</span><span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-[#D95B83]"></i>Alpha</span><span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-[#DDE5EB]"></i>Belum ada data</span>
+       </div>
+      </section>
+      <section class="surface rounded-2xl p-5 xl:col-span-5" aria-labelledby="recent-history-heading">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-[10px] font-bold tracking-[.13em] text-[#4C83B5]">AKTIVITAS</p>
+         <h2 id="recent-history-heading" class="mt-1 text-lg font-bold text-[#123B59]">Riwayat terbaru</h2>
+        </div><button type="button" data-view-target="history-view" class="text-xs font-bold text-[#4C83B5]">Lihat semua</button>
+       </div>
+       <div id="recent-history-list" class="mt-3 divide-y divide-[#E4EAF0]"></div>
+      </section>
+     </div>
+    </section>
+    <section id="history-view" class="view" aria-labelledby="history-heading">
+     <p data-template-id="history-kicker" class="canva-text text-[10px] font-bold tracking-[.14em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">CATATAN KEHADIRAN</p>
+     <h2 id="history-heading" data-template-id="history-title" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 28px;">Riwayat Presensi</h2>
+     <form id="history-filter-form" class="surface mt-5 grid gap-3 rounded-2xl p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <div>
+       <label data-template-id="filter-start-label" class="canva-text text-xs font-bold" for="filter-start" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Dari tanggal</label><input id="filter-start" type="date" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-2.5 text-sm">
+      </div>
+      <div>
+       <label data-template-id="filter-end-label" class="canva-text text-xs font-bold" for="filter-end" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Sampai tanggal</label><input id="filter-end" type="date" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-2.5 text-sm">
+      </div><button data-template-id="filter-button" type="submit" class="canva-button rounded-xl px-5 py-2.5 text-sm font-bold" style="background: rgb(18, 59, 89); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Terapkan filter</button>
+     </form>
+     <div class="mt-5 grid gap-5 xl:grid-cols-[.85fr_1.4fr]">
+      <section data-template-id="history-calendar-card" class="canva-card surface rounded-2xl p-5" style="background: rgb(255, 255, 255);">
+       <div class="flex justify-between">
+        <h3 data-template-id="history-calendar-title" class="canva-text font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 20px;">Kalender status</h3><span id="history-calendar-month" class="text-xs font-semibold text-[#6F7F8D]"></span>
+       </div>
+       <div class="mt-5 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#6F7F8D]">
+        <span>Sn</span><span>Sl</span><span>Sa</span><span>Ra</span><span>Ka</span><span>Ju</span><span>Sa</span>
+       </div>
+       <div id="history-calendar" class="mt-2 grid grid-cols-7 gap-1"></div>
+      </section>
+      <div>
+       <div class="surface overflow-hidden rounded-2xl">
+        <div class="hidden grid-cols-[1.1fr_.75fr_.75fr_1.3fr_.7fr] gap-2 border-b border-[#E4EAF0] bg-[#F8FAFB] px-5 py-3 text-[10px] font-bold tracking-wide text-[#6F7F8D] md:grid">
+         <span>TANGGAL</span><span>MASUK</span><span>KELUAR</span><span>LOKASI</span><span>STATUS</span>
+        </div>
+        <div id="history-list"></div>
+       </div>
+       <p id="history-empty" data-template-id="history-empty-text" class="canva-text hidden py-10 text-center text-sm" style="color: rgb(111, 127, 141); font-weight: 400; font-style: italic; font-size: 16px;">Belum ada riwayat pada rentang tanggal ini.</p><button id="load-more-history" data-template-id="load-more-button" type="button" class="canva-button hidden mt-4 w-full rounded-xl border px-4 py-3 font-bold" style="background: rgb(255, 255, 255); color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Muat riwayat lainnya</button>
+      </div>
+     </div>
+    </section>
+    <section id="leave-view" class="view" aria-labelledby="leave-heading">
+     <p data-template-id="leave-kicker" class="canva-text text-[10px] font-bold tracking-[.14em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">PENGAJUAN</p>
+     <h2 id="leave-heading" data-template-id="leave-title" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 28px;">Ajukan Izin</h2>
+     <div class="mt-5 grid gap-5 xl:grid-cols-[1fr_.9fr]">
+      <form id="leave-form" class="surface rounded-2xl p-5 sm:p-6">
+       <div>
+        <label data-template-id="leave-date-label" class="canva-text text-sm font-bold" for="leave-date" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Tanggal izin</label><input id="leave-date" type="date" required="" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-3">
+       </div>
+       <div class="mt-5">
+        <label data-template-id="leave-reason-label" class="canva-text text-sm font-bold" for="leave-reason" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Alasan izin</label><textarea id="leave-reason" required="" rows="5" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-3" placeholder="Tuliskan alasan singkat"></textarea>
+       </div>
+       <div class="mt-5">
+        <label data-template-id="attachment-label" class="canva-text text-sm font-bold" for="leave-attachment" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Surat keterangan (opsional)</label><input id="leave-attachment" type="file" accept=".pdf,.jpg,.jpeg,.png" class="mt-2 block w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-2 text-sm">
+        <p data-template-id="attachment-helper" class="canva-text mt-2 text-xs" style="color: rgb(111, 127, 141); font-weight: 400; font-style: normal; font-size: 16px;">Nama file lampiran akan dicatat pada pengajuan.</p>
+       </div>
+       <p id="leave-validation" class="hidden mt-3 text-sm font-bold text-[#D95B83]" aria-live="polite"></p><button id="leave-submit" data-template-id="leave-submit-button" type="submit" class="canva-button mt-5 w-full rounded-xl px-4 py-3.5 font-bold" style="background: rgb(18, 59, 89); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Kirim pengajuan izin</button>
+      </form>
+      <section>
+       <div class="flex justify-between">
+        <h3 data-template-id="leave-list-title" class="canva-text font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 20px;">Pengajuan saya</h3><span class="rounded-full bg-[#EAF2F8] px-3 py-1 text-[10px] font-bold text-[#4C83B5]">STATUS</span>
+       </div>
+       <div id="leave-list" class="mt-4 space-y-3"></div>
+       <p id="leave-empty" data-template-id="leave-empty-text" class="canva-text hidden py-8 text-center text-sm" style="color: rgb(111, 127, 141); font-weight: 400; font-style: italic; font-size: 16px;">Belum ada pengajuan izin.</p>
+      </section>
+     </div>
+    </section>
+    <section id="profile-view" class="view" aria-labelledby="profile-heading">
+     <p data-template-id="profile-kicker" class="canva-text text-[10px] font-bold tracking-[.14em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">AKUN SAYA</p>
+     <h2 id="profile-heading" data-template-id="profile-title" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 28px;">Profil</h2>
+     <section data-template-id="profile-card" class="canva-card surface mt-5 max-w-2xl rounded-2xl p-5 sm:p-6" style="background: rgb(255, 255, 255);">
+      <div class="flex gap-4">
+       <div id="profile-initial" class="flex h-15 w-15 h-16 w-16 items-center justify-center rounded-2xl bg-[#123B59] text-2xl font-bold text-white">
+        A
+       </div>
+       <div>
+        <p id="profile-name" class="text-xl font-bold text-[#123B59]"></p>
+        <p id="profile-account" class="mt-1 text-sm text-[#6F7F8D]"></p>
+       </div>
+      </div>
+      <dl class="mt-6 divide-y divide-[#E4EAF0] border-t border-[#E4EAF0]">
+       <div class="flex justify-between py-4">
+        <dt data-template-id="profile-batch-label" class="canva-text text-sm" style="color: rgb(111, 127, 141); font-weight: 400; font-style: normal; font-size: 16px;">Batch / periode</dt>
+        <dd id="profile-batch" class="text-sm font-bold text-[#123B59]"></dd>
+       </div>
+       <div class="flex justify-between py-4">
+        <dt data-template-id="profile-role-label" class="canva-text text-sm" style="color: rgb(111, 127, 141); font-weight: 400; font-style: normal; font-size: 16px;">Peran</dt>
+        <dd id="profile-role" class="text-sm font-bold text-[#123B59]"></dd>
+       </div>
+       <div class="flex justify-between py-4">
+        <dt data-template-id="profile-account-status-label" class="canva-text text-sm" style="color: rgb(111, 127, 141); font-weight: 400; font-style: normal; font-size: 16px;">Status akun</dt>
+        <dd id="profile-active" class="text-sm font-bold"></dd>
+       </div>
+      </dl>
+     </section><button id="logout-button" data-template-id="logout-button" type="button" class="canva-button mt-5 rounded-xl border px-5 py-3 font-bold" style="background: rgb(255, 255, 255); color: rgb(217, 91, 131); font-weight: 700; font-style: normal; font-size: 16px;">Keluar dari mode preview</button>
+     <section id="admin-panel" class="hidden mt-10" aria-labelledby="admin-heading">
+      <p data-template-id="admin-kicker" class="canva-text text-[10px] font-bold tracking-[.14em]" style="color: rgb(76, 131, 181); font-weight: 700; font-style: normal; font-size: 16px; letter-spacing: 0.1rem;">MODE ADMIN DEMO</p>
+      <h2 id="admin-heading" data-template-id="admin-title" class="canva-text mt-1 font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 28px;">Kelola Peserta</h2>
+      <div class="mt-5 grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
+       <form id="participant-form" class="surface rounded-2xl p-5">
+        <h3 data-template-id="participant-form-title" class="canva-text font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 20px;">Tambah peserta</h3>
+        <div class="mt-5 space-y-4">
+         <div>
+          <label data-template-id="participant-name-label" class="canva-text text-sm font-bold" for="participant-name" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Nama peserta</label><input id="participant-name" required="" type="text" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-2.5">
+         </div>
+         <div>
+          <label data-template-id="participant-batch-label" class="canva-text text-sm font-bold" for="participant-batch" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Batch / periode</label><input id="participant-batch" required="" type="text" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-2.5">
+         </div>
+         <div>
+          <label data-template-id="participant-account-label" class="canva-text text-sm font-bold" for="participant-account" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Akun login</label><input id="participant-account" required="" type="text" class="mt-2 w-full rounded-xl border border-[#E4EAF0] bg-[#F8FAFB] px-3 py-2.5">
+         </div>
+        </div><button id="participant-submit" data-template-id="participant-submit-button" type="submit" class="canva-button mt-5 w-full rounded-xl px-4 py-3 font-bold" style="background: rgb(18, 59, 89); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Tambah peserta</button>
+       </form>
+       <div id="admin-participant-list" class="space-y-3"></div>
+      </div>
+     </section>
+    </section>
+   </main>
+  </div>
+  <nav class="mobile-only fixed bottom-0 left-0 z-30 w-full border-t border-[#E4EAF0] bg-white/95 px-3 pb-3 pt-2 backdrop-blur" aria-label="Navigasi mobile">
+   <div class="grid grid-cols-4">
+    <button type="button" class="mobile-nav-item is-active flex flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold text-[#6F7F8D]" data-view-target="dashboard-view"><span class="mobile-icon rounded-xl p-1.5"><i data-lucide="layout-dashboard" class="h-5 w-5"></i></span><span data-template-id="nav-dashboard" class="canva-text" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Dashboard</span></button><button type="button" class="mobile-nav-item flex flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold text-[#6F7F8D]" data-view-target="history-view"><span class="mobile-icon rounded-xl p-1.5"><i data-lucide="history" class="h-5 w-5"></i></span><span data-template-id="nav-history" class="canva-text" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Riwayat</span></button><button type="button" class="mobile-nav-item flex flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold text-[#6F7F8D]" data-view-target="leave-view"><span class="mobile-icon rounded-xl p-1.5"><i data-lucide="calendar-clock" class="h-5 w-5"></i></span><span data-template-id="nav-leave" class="canva-text" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Izin</span></button><button type="button" class="mobile-nav-item flex flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold text-[#6F7F8D]" data-view-target="profile-view"><span class="mobile-icon rounded-xl p-1.5"><i data-lucide="user-round" class="h-5 w-5"></i></span><span data-template-id="nav-profile" class="canva-text" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Profil</span></button>
+   </div>
+  </nav>
+  <div id="toast" class="toast fixed bottom-7 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm rounded-xl bg-[#0D2F47] px-4 py-3 text-center text-sm font-bold text-white shadow-xl" aria-live="polite"></div>
+  <div id="confirm-modal" class="modal-layer fixed inset-0 z-50 items-center justify-center bg-[#0D2F47]/45 p-5">
+   <div data-template-id="confirm-card" class="canva-card w-full max-w-sm rounded-2xl p-6 shadow-2xl" style="background: rgb(255, 255, 255);">
+    <h2 data-template-id="confirm-title" class="canva-text font-bold" style="color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 24px;">Ubah status akun?</h2>
+    <p id="confirm-message" class="mt-2 text-sm leading-relaxed text-[#6F7F8D]"></p>
+    <div class="mt-6 grid grid-cols-2 gap-3">
+     <button id="confirm-cancel" data-template-id="confirm-cancel-button" type="button" class="canva-button rounded-xl border px-4 py-3 font-bold" style="background: rgb(255, 255, 255); color: rgb(18, 59, 89); font-weight: 700; font-style: normal; font-size: 16px;">Batal</button><button id="confirm-action" data-template-id="confirm-action-button" type="button" class="canva-button rounded-xl px-4 py-3 font-bold" style="background: rgb(18, 59, 89); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 16px;">Ya, lanjutkan</button>
+    </div>
+   </div>
+  </div>
+  <template id="history-template">
+   <article data-template-id="history-item" class="canva-card border-b border-[#E4EAF0] bg-white px-5 py-4 last:border-0">
+    <div class="grid gap-2 md:grid-cols-[1.1fr_.75fr_.75fr_1.3fr_.7fr] md:items-center">
+     <p class="history-date text-sm font-bold text-[#123B59]"></p>
+     <p class="history-in text-sm text-[#123B59]"></p>
+     <p class="history-out text-sm text-[#123B59]"></p>
+     <p class="history-location text-xs text-[#6F7F8D]"></p><span class="history-status w-fit rounded-full px-2.5 py-1 text-[10px] font-bold"></span>
+    </div>
+   </article>
+  </template>
+  <template id="leave-template">
+   <article data-template-id="leave-item" class="canva-card surface rounded-xl p-4">
+    <div class="flex justify-between gap-3">
+     <div>
+      <p class="leave-date text-sm font-bold text-[#123B59]"></p>
+      <p class="leave-reason mt-1 text-sm text-[#6F7F8D]"></p>
+      <p class="leave-file mt-2 text-xs text-[#6F7F8D]"></p>
+     </div><span class="leave-status h-fit rounded-full px-2.5 py-1 text-[10px] font-bold"></span>
+    </div>
+   </article>
+  </template>
+  <template id="participant-template">
+   <article data-template-id="participant-item" class="canva-card surface rounded-xl p-4">
+    <div class="flex justify-between gap-3">
+     <div>
+      <p class="participant-name text-sm font-bold text-[#123B59]"></p>
+      <p class="participant-meta mt-1 text-xs text-[#6F7F8D]"></p>
+     </div><span class="participant-state h-fit rounded-full px-2.5 py-1 text-[10px] font-bold"></span>
+    </div><button type="button" class="participant-toggle mt-4 w-full rounded-xl border border-[#E4EAF0] px-3 py-2 text-sm font-bold text-[#123B59]"></button>
+   </article>
+  </template>
+  <script>
+    const APP={records:[],role:"participant",currentAccount:"anisa.pratama",historyLimit:8,pendingAction:null};
+    const $=s=>document.querySelector(s), pad=n=>String(n).padStart(2,"0"), isoDate=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const emptyRecord=()=>({record_type:"",name:"",login_account:"",batch_period:"",role:"",is_active:true,attendance_date:"",check_in_time:"",check_out_time:"",location_label:"",latitude:"",longitude:"",attendance_status:"",leave_date:"",leave_reason:"",leave_attachment_name:"",leave_status:""});
+    const fmtDate=v=>v?new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"short",year:"numeric"}).format(new Date(v+"T12:00:00")):"—";
+    const fmtTime=v=>v?new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit"}).format(new Date(v)):"—";
+    const participant=()=>APP.records.find(r=>r.record_type==="participant"&&r.login_account===APP.currentAccount)||APP.records.find(r=>r.record_type==="participant");
+    const attendance=()=>APP.records.filter(r=>r.record_type==="attendance"&&r.login_account===participant()?.login_account);
+    const leaves=()=>APP.records.filter(r=>r.record_type==="leave"&&r.login_account===participant()?.login_account);
+    const todayAttendance=()=>attendance().find(r=>r.attendance_date===isoDate());
+    const todayLeave=()=>leaves().find(r=>r.leave_date===isoDate()&&r.leave_status==="Disetujui");
+    function toast(t){$("#toast").textContent=t;$("#toast").classList.add("show");setTimeout(()=>$("#toast").classList.remove("show"),2800)}
+    function style(status){return({Hadir:["bg-[#EAF2F8]","text-[#28618F]"],"Sudah check-in":["bg-[#EAF2F8]","text-[#28618F]"],Izin:["bg-[#EEF5FA]","text-[#4C83B5]"],Alpha:["bg-[#FCF3F6]","text-[#B84469]"],Pending:["bg-[#F4F6F8]","text-[#6F7F8D]"],Disetujui:["bg-[#EAF2F8]","text-[#28618F]"],Ditolak:["bg-[#FCF3F6]","text-[#B84469]"],"Belum absen":["bg-[#F4F6F8]","text-[#6F7F8D]"]}[status]||["bg-[#F4F6F8]","text-[#6F7F8D]"])}
+    function updateClock(){const n=new Date();$("#live-clock").textContent=`${pad(n.getHours())}.${pad(n.getMinutes())}.${pad(n.getSeconds())}`;$("#header-date").textContent=new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(n);$("#today-date").textContent=new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"short"}).format(n)}
+    function setLoading(v,text=""){const b=$("#attendance-action");$("#attendance-loading").textContent=text;$("#attendance-loading").classList.toggle("hidden",!v);b.disabled=v;b.classList.toggle("opacity-60",v)}
+    function renderCalendar(id,date,rows,leaveRows,compact=false){const el=$("#"+id);el.innerHTML="";const y=date.getFullYear(),m=date.getMonth(),start=new Date(y,m,1).getDay(),total=new Date(y,m+1,0).getDate(),a=new Set(rows.map(x=>x.attendance_date)),l=new Set(leaveRows.map(x=>x.leave_date));for(let i=0;i<start;i++)el.appendChild(document.createElement("div"));for(let d=1;d<=total;d++){const key=`${y}-${pad(m+1)}-${pad(d)}`,cell=document.createElement("div");cell.textContent=d;cell.className=`calendar-cell flex items-center justify-center rounded-lg text-xs font-bold ${a.has(key)?"bg-[#EAF2F8] text-[#28618F]":l.has(key)?"bg-[#EEF5FA] text-[#4C83B5]":"bg-[#F8FAFB] text-[#6F7F8D]"} ${key===isoDate()?"today":""}`;el.appendChild(cell)}const label=new Intl.DateTimeFormat("id-ID",{month:"long",year:"numeric"}).format(date);$(compact?"#mini-calendar-month":"#history-calendar-month").textContent=label}
+    function renderDashboard(){const a=todayAttendance(),l=todayLeave(),p=participant(),button=$("#attendance-action");let status="Belum absen",help="Belum ada catatan kehadiran hari ini.",label="Check-in",icon="log-in",disabled=false;if(!p?.is_active){status="Akun tidak aktif";help="Hubungi admin untuk mengaktifkan akun Anda.";label="Akun nonaktif";disabled=true}else if(l){status="Izin";help="Izin Anda telah disetujui untuk hari ini.";label="Izin disetujui";disabled=true}else if(a?.check_out_time){status="Hadir";help=`Check-out tercatat pukul ${fmtTime(a.check_out_time)}.`;label="Presensi selesai";icon="check";disabled=true}else if(a?.check_in_time){status="Sudah check-in";help=`Masuk tercatat pukul ${fmtTime(a.check_in_time)}.`;label="Check-out";icon="log-out"}const s=style(status);$("#today-status-text").textContent=status;$("#today-status-helper").textContent=help;$("#today-status-chip").textContent=status;$("#today-status-chip").className=`rounded-full px-2.5 py-1 text-[10px] font-bold ${s.join(" ")}`;$("#status-orb").className=`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${s.join(" ")}`;$("#status-orb").innerHTML=`<i data-lucide="${icon}" class="h-5 w-5"></i>`;$("#attendance-button-text").textContent=label;$("#attendance-icon").setAttribute("data-lucide",icon);button.disabled=disabled;button.className=`canva-button mt-5 flex w-full items-center justify-center gap-3 rounded-xl px-5 py-4 font-bold transition hover:-translate-y-0.5 disabled:cursor-not-allowed ${disabled?"bg-[#DDE5EB] text-[#6F7F8D]":"bg-[#123B59] text-white"}`;const prefix=isoDate().slice(0,7),monthA=attendance().filter(x=>x.attendance_date.startsWith(prefix)),monthL=leaves().filter(x=>x.leave_date.startsWith(prefix)&&x.leave_status==="Disetujui");$("#present-count").textContent=monthA.length;$("#leave-count").textContent=monthL.length;$("#alpha-count").textContent="0";renderActivity(a,l);renderCalendar("mini-calendar",new Date(),monthA,monthL,true);renderRecentHistory();lucide.createIcons()}
+    function renderActivity(a,l){let state="Belum absen";if(l)state="Izin";else if(a?.check_out_time)state="Selesai";else if(a?.check_in_time)state="Dalam sesi";const s=style(state==="Selesai"?"Hadir":state);$("#activity-state").textContent=state;$("#activity-state").className=`rounded-full px-2.5 py-1 text-[10px] font-bold ${s.join(" ")}`;$("#activity-checkin-time").textContent=a?.check_in_time?fmtTime(a.check_in_time):"Belum tercatat";$("#activity-checkin-location").textContent=a?.location_label||(l?"Izin disetujui untuk hari ini.":"Lokasi akan muncul setelah presensi.");$("#activity-checkout-time").textContent=a?.check_out_time?fmtTime(a.check_out_time):"Menunggu check-out";$("#checkin-dot").className=`z-10 flex h-6 w-6 items-center justify-center rounded-full ${a?.check_in_time?"bg-[#4C83B5] text-white":"bg-[#EAF2F8] text-[#4C83B5]"}`;$("#checkout-dot").className=`z-10 flex h-6 w-6 items-center justify-center rounded-full ${a?.check_out_time?"bg-[#4C83B5] text-white":"bg-[#F4F6F8] text-[#6F7F8D]"}`}
+    function renderRecentHistory(){const el=$("#recent-history-list");el.innerHTML="";attendance().sort((a,b)=>b.attendance_date.localeCompare(a.attendance_date)).slice(0,3).forEach(r=>{const row=document.createElement("div");row.className="flex items-center justify-between gap-3 py-3";row.innerHTML=`<div><p class="text-sm font-bold text-[#123B59]">${fmtDate(r.attendance_date)}</p><p class="mt-0.5 text-xs text-[#6F7F8D]">${fmtTime(r.check_in_time)} · ${r.location_label||"Lokasi tercatat"}</p></div><span class="rounded-full px-2 py-1 text-[10px] font-bold ${style(r.attendance_status||"Hadir").join(" ")}">${r.attendance_status||"Hadir"}</span>`;el.appendChild(row)});if(!el.children.length)el.innerHTML='<p class="py-5 text-sm text-[#6F7F8D]">Belum ada aktivitas presensi.</p>'}
+    async function useLocation(demo=false){$("#location-error").classList.add("hidden");setLoading(true,"Mendeteksi lokasi...");if(demo){await new Promise(r=>setTimeout(r,650));return saveAttendance("Lokasi demo — Bandung, Jawa Barat","-6.9175","107.6191")}if(!navigator.geolocation)return unavailable();navigator.geolocation.getCurrentPosition(p=>saveAttendance("Lokasi GPS terdeteksi",String(p.coords.latitude.toFixed(6)),String(p.coords.longitude.toFixed(6))),unavailable,{enableHighAccuracy:true,timeout:10000,maximumAge:60000})}
+    function unavailable(){setLoading(false);$("#location-error").classList.remove("hidden")}
+    async function saveAttendance(label,latitude,longitude){const p=participant(),exist=todayAttendance(),now=new Date().toISOString();let r;if(exist?.check_in_time&&!exist.check_out_time){setLoading(true,"Mencatat check-out...");r=await window.dataSdk.update({...exist,check_out_time:now,location_label:label,latitude,longitude})}else if(!exist)r=await window.dataSdk.create({...emptyRecord(),record_type:"attendance",name:p.name,login_account:p.login_account,batch_period:p.batch_period,role:p.role,is_active:p.is_active,attendance_date:isoDate(),check_in_time:now,location_label:label,latitude,longitude,attendance_status:"Hadir"});setLoading(false);if(!r?.isOk)return toast("Catatan belum tersimpan. Coba lagi.");$("#attendance-feedback-text").textContent=`${exist?.check_in_time?"Check-out":"Check-in"} berhasil tercatat pukul ${fmtTime(now)}.`;$("#attendance-feedback").classList.remove("hidden")}
+    function renderHistory(){let rows=[...attendance()].sort((a,b)=>b.attendance_date.localeCompare(a.attendance_date));const start=$("#filter-start").value,end=$("#filter-end").value;if(start)rows=rows.filter(r=>r.attendance_date>=start);if(end)rows=rows.filter(r=>r.attendance_date<=end);const el=$("#history-list");el.innerHTML="";$("#history-empty").classList.toggle("hidden",rows.length>0);rows.slice(0,APP.historyLimit).forEach(r=>{const x=$("#history-template").content.cloneNode(true);x.querySelector(".history-date").textContent=fmtDate(r.attendance_date);x.querySelector(".history-in").textContent=fmtTime(r.check_in_time);x.querySelector(".history-out").textContent=fmtTime(r.check_out_time);x.querySelector(".history-location").textContent=r.location_label||"Lokasi belum tercatat";const b=x.querySelector(".history-status");b.textContent=r.attendance_status||"Hadir";b.className=`history-status w-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${style(r.attendance_status||"Hadir").join(" ")}`;el.appendChild(x)});$("#load-more-history").classList.toggle("hidden",rows.length<=APP.historyLimit);renderCalendar("history-calendar",new Date(),attendance(),leaves().filter(r=>r.leave_status==="Disetujui"))}
+    function renderLeaves(){const el=$("#leave-list"),rows=[...leaves()].sort((a,b)=>b.leave_date.localeCompare(a.leave_date));el.innerHTML="";$("#leave-empty").classList.toggle("hidden",rows.length>0);rows.forEach(r=>{const x=$("#leave-template").content.cloneNode(true);x.querySelector(".leave-date").textContent=fmtDate(r.leave_date);x.querySelector(".leave-reason").textContent=r.leave_reason;x.querySelector(".leave-file").textContent=r.leave_attachment_name?`Lampiran: ${r.leave_attachment_name}`:"Tanpa lampiran";const b=x.querySelector(".leave-status");b.textContent=r.leave_status;b.className=`leave-status h-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${style(r.leave_status).join(" ")}`;el.appendChild(x)})}
+    function renderProfile(){const p=participant();if(!p)return;["#profile-initial","#sidebar-initial"].forEach(id=>$(id).textContent=p.name.charAt(0).toUpperCase());$("#profile-name").textContent=p.name;$("#profile-account").textContent=p.login_account;$("#profile-batch").textContent=p.batch_period;$("#profile-role").textContent=APP.role==="admin"?"Admin demo":p.role;$("#profile-active").textContent=p.is_active?"Aktif":"Nonaktif";$("#profile-active").className=`text-sm font-bold ${p.is_active?"text-[#4C83B5]":"text-[#D95B83]"}`;$("#sidebar-name").textContent=p.name;$("#sidebar-batch").textContent=p.batch_period;$("#sidebar-role").textContent=APP.role==="admin"?"Admin demo":p.role;$("#admin-panel").classList.toggle("hidden",APP.role!=="admin");$("#admin-nav").classList.toggle("hidden",APP.role!=="admin");$("#admin-nav").classList.toggle("flex",APP.role==="admin");if(APP.role==="admin")renderParticipants()}
+    function renderParticipants(){const el=$("#admin-participant-list");el.innerHTML="";APP.records.filter(r=>r.record_type==="participant").sort((a,b)=>a.batch_period.localeCompare(b.batch_period)).forEach(p=>{const x=$("#participant-template").content.cloneNode(true);x.querySelector(".participant-name").textContent=p.name;x.querySelector(".participant-meta").textContent=`${p.batch_period} · ${p.login_account}`;const s=x.querySelector(".participant-state");s.textContent=p.is_active?"Aktif":"Nonaktif";s.className=`participant-state h-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${p.is_active?"bg-[#EAF2F8] text-[#28618F]":"bg-[#F4F6F8] text-[#6F7F8D]"}`;const b=x.querySelector(".participant-toggle");b.textContent=p.is_active?"Nonaktifkan akun":"Aktifkan kembali";b.addEventListener("click",()=>{APP.pendingAction=p;$("#confirm-message").textContent=p.is_active?`Nonaktifkan akun ${p.name}? Peserta tidak dapat melakukan presensi hingga diaktifkan kembali.`:`Aktifkan kembali akun ${p.name}?`;$("#confirm-modal").classList.add("show")});el.appendChild(x)})}
+    async function submitLeave(e){e.preventDefault();const date=$("#leave-date").value,reason=$("#leave-reason").value.trim(),v=$("#leave-validation");v.classList.add("hidden");if(!date||!reason){v.textContent="Tanggal dan alasan izin perlu diisi.";v.classList.remove("hidden");return}const b=$("#leave-submit");b.disabled=true;const p=participant(),file=$("#leave-attachment").files[0],r=await window.dataSdk.create({...emptyRecord(),record_type:"leave",name:p.name,login_account:p.login_account,batch_period:p.batch_period,role:p.role,is_active:p.is_active,leave_date:date,leave_reason:reason,leave_attachment_name:file?file.name:"",leave_status:"Pending"});b.disabled=false;if(r.isOk){e.target.reset();toast("Pengajuan izin berhasil dikirim.")}else{v.textContent="Pengajuan belum tersimpan. Coba lagi.";v.classList.remove("hidden")}}
+    async function submitParticipant(e){e.preventDefault();const name=$("#participant-name").value.trim(),batch=$("#participant-batch").value.trim(),account=$("#participant-account").value.trim();if(!name||!batch||!account)return;const b=$("#participant-submit");b.disabled=true;const r=await window.dataSdk.create({...emptyRecord(),record_type:"participant",name,login_account:account,batch_period:batch,role:"Peserta",is_active:true});b.disabled=false;if(r.isOk){e.target.reset();toast("Peserta baru telah ditambahkan.")}else toast("Peserta belum dapat ditambahkan.")}
+    function renderAll(){renderDashboard();renderHistory();renderLeaves();renderProfile()}
+    document.addEventListener("DOMContentLoaded",async()=>{lucide.createIcons();updateClock();setInterval(updateClock,1000);document.querySelectorAll("[data-view-target]").forEach(b=>b.addEventListener("click",()=>{const t=b.dataset.viewTarget;document.querySelectorAll("[data-view-target]").forEach(x=>x.classList.remove("is-active"));document.querySelectorAll(".view").forEach(x=>x.classList.remove("is-active"));document.querySelectorAll(`[data-view-target="${t}"]`).forEach(x=>x.classList.add("is-active"));$("#"+t).classList.add("is-active");window.scrollTo({top:0,behavior:"smooth"})}));$("#attendance-action").addEventListener("click",()=>useLocation());$("#retry-location").addEventListener("click",()=>useLocation());$("#demo-location").addEventListener("click",()=>useLocation(true));$("#leave-form").addEventListener("submit",submitLeave);$("#participant-form").addEventListener("submit",submitParticipant);$("#history-filter-form").addEventListener("submit",e=>{e.preventDefault();APP.historyLimit=8;renderHistory()});$("#load-more-history").addEventListener("click",()=>{APP.historyLimit+=8;renderHistory()});$("#role-switch").addEventListener("change",e=>{APP.role=e.target.value;renderProfile()});$("#logout-button").addEventListener("click",()=>toast("Mode sesi lokal telah ditutup. Pilih mode peserta untuk melanjutkan preview."));$("#confirm-cancel").addEventListener("click",()=>$("#confirm-modal").classList.remove("show"));$("#confirm-action").addEventListener("click",async()=>{if(!APP.pendingAction)return;const r=await window.dataSdk.update({...APP.pendingAction,is_active:!APP.pendingAction.is_active});$("#confirm-modal").classList.remove("show");if(!r.isOk)toast("Status akun belum diperbarui. Coba lagi.");APP.pendingAction=null});const init=await window.dataSdk.init({onDataChanged(data){APP.records=data;renderAll()}});if(!init.isOk)toast("Data belum dapat dimuat. Coba buka kembali halaman ini.")});
+  </script>
+ 
+</body></html>

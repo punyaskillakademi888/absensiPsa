@@ -1,0 +1,6 @@
+{
+  "name": "HadirKu - Sistem Absensi Kejuruan",
+  "description": "Sistem absensi pelatihan terpadu dengan 3 role (Admin, Mentor, Trainee), klasifikasi kejuruan, dan ekspor laporan rekapitulasi kehadiran bulanan ke PDF & Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
