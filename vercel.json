@@ -10,6 +10,20 @@
       "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/auto-checkout",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/complete-batches",
+      "schedule": "5 17 * * *"
+    },
+    {
+      "path": "/api/cron/complete-missions",
+      "schedule": "5 17 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/dispatch?path=:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }

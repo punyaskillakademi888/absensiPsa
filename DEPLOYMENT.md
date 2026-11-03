@@ -16,6 +16,7 @@ Wajib:
 
 - `JWT_SECRET` — secret acak panjang
 - `TIDB_HOST`, `TIDB_PORT` (biasanya `4000`), `TIDB_USER`, `TIDB_PASSWORD`, `TIDB_DATABASE` (atau `DATABASE_URL`)
+- `CRON_SECRET` — secret acak untuk mengamankan Vercel Cron
 
 Opsional:
 
@@ -24,6 +25,12 @@ Opsional:
 - `VITE_API_URL` **harus kosong** jika frontend dan API satu domain Vercel. Jangan isi `http://localhost:...` di Production.
 
 Setelah mengubah env, klik **Redeploy** (tanpa cache jika function masih 404).
+
+Vercel Cron memanggil `/api/cron/auto-checkout` setiap pukul 12.00 UTC (19.00 WIB). Record hari itu yang sudah check-in tetapi belum check-out akan ditutup pada pukul 19.00 WIB. Server Express yang berjalan terus juga menjalankan proses yang sama secara berkala setelah pukul 19.00 WIB.
+
+Vercel Cron memanggil `/api/cron/complete-batches` setiap pukul 17.05 UTC (00.05 WIB). Enrollment peserta pada Batch 5 dan batch berikutnya otomatis berstatus selesai setelah tanggal akhir batch terlewati; status batch juga diperbarui menjadi selesai. Server Express yang berjalan terus menjalankan pemeriksaan ini setiap menit dan saat startup.
+
+Vercel Cron juga memanggil `/api/cron/complete-missions` setiap pukul 17.05 UTC (00.05 WIB). Misi yang tenggatnya sudah terlewati otomatis ditandai selesai dan tidak lagi ditampilkan kepada peserta. Pengumpulan tetap perlu divalidasi mentor; setelah disetujui, poin misi diberikan otomatis sesuai nilai saat misi dipublikasikan.
 
 ## TiDB Cloud
 

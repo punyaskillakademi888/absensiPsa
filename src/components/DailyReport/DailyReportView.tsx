@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DailyReport } from '../../types';
 import { api } from '../../services/api';
@@ -12,7 +12,6 @@ import {
   Check,
   Search,
   ChevronDown,
-  CalendarDays,
   Eye,
   MessageSquare,
   ImageIcon,
@@ -24,6 +23,7 @@ import {
 import { getTodayDateString, INDONESIAN_MONTHS } from '../../utils/dateUtils';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
 import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { DEFAULT_PAGE_SIZE, Pagination } from '../Pagination';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -35,6 +35,41 @@ const formatDateID = (dateStr: string) => {
 const formatTimeShort = (iso: string) => {
   const d = new Date(iso);
   return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+};
+
+const TraineeAvatar: React.FC<{ src?: string; name: string; className: string }> = ({ src, name, className }) => {
+  const [imageFailed, setImageFailed] = useState(!src);
+
+  useEffect(() => {
+    setImageFailed(!src);
+  }, [src]);
+
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join('')
+    .toUpperCase();
+
+  return (
+    <span
+      role="img"
+      aria-label={name}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E4EAF0] bg-[#EAF2F8] font-bold text-[#28618F] ${className}`}
+    >
+      {!imageFailed && src ? (
+        <img
+          src={src}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span aria-hidden="true">{initials || '?'}</span>
+      )}
+    </span>
+  );
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -56,6 +91,8 @@ export const DailyReportView: React.FC = () => {
 
   const today = getTodayDateString();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -182,6 +219,9 @@ export const DailyReportView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [filterKejuruan, setFilterKejuruan] = useState('all');
+  const [filterDate, setFilterDate] = useState('');
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewPageSize, setReviewPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [previewReport, setPreviewReport] = useState<DailyReport | null>(null);
@@ -190,6 +230,7 @@ export const DailyReportView: React.FC = () => {
     return dailyReports
       .filter(r => {
         if (isMentor && currentUser.kejuruanId && r.kejuruanId !== currentUser.kejuruanId) return false;
+        if (filterDate && r.date.slice(0, 10) !== filterDate) return false;
         if (filterStatus !== 'all' && r.status !== filterStatus) return false;
         if (!matchesKejuruanFilter(filterKejuruan, kejuruanList, r.kejuruanId, r.kejuruanName)) return false;
         if (searchQuery) {
@@ -203,7 +244,30 @@ export const DailyReportView: React.FC = () => {
         return true;
       })
       .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  }, [dailyReports, isMentor, currentUser.kejuruanId, filterStatus, filterKejuruan, searchQuery, kejuruanList]);
+  }, [dailyReports, isMentor, currentUser.kejuruanId, filterDate, filterStatus, filterKejuruan, searchQuery, kejuruanList]);
+  const reviewTotalPages = Math.max(1, Math.ceil(relevantReports.length / reviewPageSize));
+  const currentReviewPage = Math.min(reviewPage, reviewTotalPages);
+  const reviewStartIndex = (currentReviewPage - 1) * reviewPageSize;
+  const paginatedRelevantReports = useMemo(
+    () => relevantReports.slice(reviewStartIndex, reviewStartIndex + reviewPageSize),
+    [relevantReports, reviewStartIndex, reviewPageSize]
+  );
+
+  useEffect(() => {
+    setReviewPage(1);
+  }, [searchQuery, filterStatus, filterKejuruan, filterDate, reviewPageSize]);
+
+  const historyTotalPages = Math.max(1, Math.ceil(myAllReports.length / historyPageSize));
+  const currentHistoryPage = Math.min(historyPage, historyTotalPages);
+  const historyStartIndex = (currentHistoryPage - 1) * historyPageSize;
+  const paginatedHistoryReports = useMemo(
+    () => myAllReports.slice(historyStartIndex, historyStartIndex + historyPageSize),
+    [myAllReports, historyStartIndex, historyPageSize]
+  );
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historyPageSize, myAllReports.length]);
 
   const pendingCount = useMemo(
     () =>
@@ -487,7 +551,7 @@ export const DailyReportView: React.FC = () => {
                     Belum ada laporan yang dikirim.
                   </div>
                 ) : (
-                  myAllReports.map(report => (
+                  paginatedHistoryReports.map(report => (
                     <div key={report.id} className="p-4 hover:bg-[#F4F6F8] transition">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div>
@@ -525,6 +589,16 @@ export const DailyReportView: React.FC = () => {
                   ))
                 )}
               </div>
+              <Pagination
+                page={currentHistoryPage}
+                totalPages={historyTotalPages}
+                totalItems={myAllReports.length}
+                pageSize={historyPageSize}
+                startIndex={historyStartIndex}
+                itemLabel="laporan"
+                onPageChange={setHistoryPage}
+                onPageSizeChange={setHistoryPageSize}
+              />
             </div>
           </div>
         </div>
@@ -610,6 +684,29 @@ export const DailyReportView: React.FC = () => {
           <option value="rejected">Perlu Revisi</option>
         </select>
 
+        <div className="flex items-center gap-2">
+          <label htmlFor="daily-report-date-filter" className="text-xs font-semibold text-[#6F7F8D] whitespace-nowrap">
+            Tanggal laporan
+          </label>
+          <input
+            id="daily-report-date-filter"
+            type="date"
+            value={filterDate}
+            onChange={event => setFilterDate(event.target.value)}
+            aria-label="Filter laporan berdasarkan tanggal"
+            className="min-w-0 text-xs py-1.5 px-2.5 rounded-lg border border-[#E4EAF0] bg-[#F4F6F8] text-[#123B59] outline-none focus:ring-1 focus:ring-[#4C83B5]"
+          />
+          {filterDate && (
+            <button
+              type="button"
+              onClick={() => setFilterDate('')}
+              className="text-xs font-semibold text-[#4C83B5] hover:text-[#123B59] whitespace-nowrap"
+            >
+              Semua tanggal
+            </button>
+          )}
+        </div>
+
         {isAdmin && (
           <select
             value={filterKejuruan}
@@ -650,14 +747,14 @@ export const DailyReportView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                relevantReports.map(report => (
+                paginatedRelevantReports.map(report => (
                   <tr key={report.id} className="hover:bg-[#F4F6F8] transition">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
-                        <img
+                        <TraineeAvatar
                           src={report.traineeAvatar}
-                          alt={report.traineeName}
-                          className="w-8 h-8 rounded-full object-cover border border-[#E4EAF0]"
+                          name={report.traineeName}
+                          className="h-8 w-8 text-[10px]"
                         />
                         <div>
                           <div className="font-semibold text-[#123B59]">{report.traineeName}</div>
@@ -718,6 +815,16 @@ export const DailyReportView: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={currentReviewPage}
+          totalPages={reviewTotalPages}
+          totalItems={relevantReports.length}
+          pageSize={reviewPageSize}
+          startIndex={reviewStartIndex}
+          itemLabel="laporan"
+          onPageChange={setReviewPage}
+          onPageSizeChange={setReviewPageSize}
+        />
       </div>
 
       {/* Photo Preview Modal */}
@@ -772,7 +879,11 @@ export const DailyReportView: React.FC = () => {
             <div className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4">
               {/* Trainee info */}
               <div className="flex items-center gap-3 p-3 rounded-xl bg-[#EAF2F8] border border-[#A9C7DE]/40">
-                <img src={selectedReport.traineeAvatar} alt={selectedReport.traineeName} className="w-10 h-10 rounded-full border border-[#E4EAF0]" />
+                <TraineeAvatar
+                  src={selectedReport.traineeAvatar}
+                  name={selectedReport.traineeName}
+                  className="h-10 w-10 text-xs"
+                />
                 <div>
                   <div className="font-semibold text-xs text-[#123B59]">{selectedReport.traineeName}</div>
                   <div className="text-[11px] text-[#4C83B5]">{selectedReport.traineeNim} · {selectedReport.kejuruanName}</div>

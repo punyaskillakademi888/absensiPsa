@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MobileHeaderStatus } from '../MobileHeaderStatus';
 import {
@@ -26,6 +26,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Kejuruan, User, Role } from '../../types';
+import { Pagination } from '../Pagination';
 import {
   exportUsersToExcel,
   downloadUserImportTemplate,
@@ -51,6 +52,8 @@ export const TraineeManagementView: React.FC = () => {
   const [activeRoleFilter, setActiveRoleFilter] = useState<'all' | 'trainee' | 'mentor'>('all');
   const [selectedKejuruan, setSelectedKejuruan] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(7);
 
   // Modals
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState<boolean>(false);
@@ -140,6 +143,19 @@ export const TraineeManagementView: React.FC = () => {
       return matchSearch;
     });
   }, [users, kejuruanList, activeRoleFilter, selectedKejuruan, searchQuery]);
+
+  const totalItems = filteredUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedUsers = useMemo(
+    () => filteredUsers.slice(startIndex, startIndex + pageSize),
+    [filteredUsers, startIndex, pageSize]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeRoleFilter, selectedKejuruan, searchQuery, pageSize]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -576,7 +592,7 @@ export const TraineeManagementView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user, idx) => {
+                paginatedUsers.map((user, idx) => {
                   const isPasswordVisible = !!visiblePasswords[user.id];
                   const isCodeCopied = copiedId === user.id && copiedType === 'code';
                   const isPassCopied = copiedId === user.id && copiedType === 'pass';
@@ -595,7 +611,7 @@ export const TraineeManagementView: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-3.5 text-center text-[#6F7F8D] tabular-nums font-semibold">
-                        {idx + 1}
+                        {startIndex + idx + 1}
                       </td>
 
                       {/* User Info */}
@@ -715,6 +731,16 @@ export const TraineeManagementView: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          startIndex={startIndex}
+          itemLabel="akun"
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {/* MODAL 1: ADD USER (TRAINEE / MENTOR) */}

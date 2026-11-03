@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getPool } from './db.js';
+import { getJakartaDateTime } from './attendanceAutoCheckout.js';
+import { completeExpiredMissions } from './missionLifecycle.js';
 import { authenticateToken, AuthenticatedRequest } from './auth.js';
 import { canonicalKejuruanCode } from './kejuruanCodes.js';
 import {
@@ -141,6 +143,7 @@ appDataRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res:
   try {
     const user = req.user!;
     const pool = getPool();
+    await completeExpiredMissions(pool, getJakartaDateTime().date);
     const scope = user.role === 'admin' ? null : user.role === 'mentor' ? user.kejuruanId || '' : user.id;
     const programNames = user.role === 'admin' ? [] : assignedProgramNames(user);
     const nameClause = normalizedNameClause('name', programNames);
@@ -573,6 +576,24 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
       [target.id, date]
     );
     const existingRecord = existingRows[0];
+    if (target.id === user.id && checkOutTime && !existingRecord?.check_in_time && !checkInTime) {
+      return res.status(400).json({ success: false, message: 'Check-out tidak dapat dicatat sebelum check-in.' });
+    }
+    if (target.id === user.id && checkInTime) {
+      const { date: todayWib, time: currentTimeWib } = getJakartaDateTime();
+      if (date !== todayWib && !existingRecord?.check_in_time) {
+        return res.status(403).json({
+          success: false,
+          message: 'Check-in hanya dapat dicatat untuk tanggal hari ini.',
+        });
+      }
+      if (date === todayWib && currentTimeWib >= '19:00:00' && !existingRecord?.check_in_time) {
+        return res.status(403).json({
+          success: false,
+          message: 'Batas check-in hari ini sudah berakhir pukul 19.00 WIB.',
+        });
+      }
+    }
     // Penalti keterlambatan memakai check-in efektif (request ini atau yang sudah
     // tersimpan) supaya retry tidak menghitung poin dua kali.
     const penaltySettings = await loadPenaltySettings();
@@ -805,12 +826,22 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
     // missions from this whole-app snapshot: another tab may hold stale data.
 
     if (user.role === 'trainee') {
+      const currentWibDate = getJakartaDateTime().date;
       for (const r of lists.missionSubmissions) {
         if (!own(r)) continue;
+        const [missionRows] = await connection.query<any[]>(
+          'SELECT id, status, due_date, points FROM missions WHERE id = ? LIMIT 1 FOR UPDATE',
+          [r.missionId]
+        );
+        const mission = missionRows[0];
+        if (!mission || mission.status !== 'active' || dateText(mission.due_date) < currentWibDate) {
+          console.warn(`[Mission] Pengumpulan stale/terlambat diabaikan untuk misi ${r.missionId}, peserta ${user.id}.`);
+          continue;
+        }
         // Reviews are authoritative only through the dedicated review endpoint.
         await upsert(
           `INSERT INTO mission_submissions (id,mission_id,mission_title,trainee_id,trainee_name,trainee_nim,trainee_avatar,kejuruan_id,kejuruan_name,submission_link,notes,points,submitted_at,status,reviewed_by,reviewed_at,feedback) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE mission_title=VALUES(mission_title),submission_link=VALUES(submission_link),notes=VALUES(notes),submitted_at=VALUES(submitted_at)`,
-          [r.id,r.missionId,r.missionTitle,r.traineeId,r.traineeName,r.traineeNim,r.traineeAvatar || null,r.kejuruanId || null,r.kejuruanName || null,r.submissionLink || null,r.notes || '',r.points,dateTimeValue(r.submittedAt),'pending',null,null,null]
+          [r.id,r.missionId,r.missionTitle,r.traineeId,r.traineeName,r.traineeNim,r.traineeAvatar || null,r.kejuruanId || null,r.kejuruanName || null,r.submissionLink || null,r.notes || '',Number(mission.points),dateTimeValue(r.submittedAt),'pending',null,null,null]
         );
       }
     }

@@ -19,9 +19,9 @@ const enrollmentStatusLabel = (status: User['enrollmentStatus']): string => {
     case 'active':
       return 'Aktif';
     case 'graduated':
-      return 'Lulus';
+      return 'Selesai';
     case 'withdrawn':
-      return 'Mengundurkan diri';
+      return 'Keluar';
     default:
       return 'Belum ditetapkan';
   }
