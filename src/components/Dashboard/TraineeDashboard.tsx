@@ -216,7 +216,7 @@ export const TraineeDashboard: React.FC = () => {
     isButtonDisabled = true;
   } else if (isCheckedIn) {
     statusText = 'Sudah Check-in';
-    statusHelper = `Masuk tercatat pukul ${todayRecord?.checkInTime} WIB. Jangan lupa check-out saat jam pulang.`;
+    statusHelper = `Masuk tercatat pukul ${todayRecord?.checkInTime} WIB. Jangan lupa check-out saat jam pulang (bisa dari mana saja).`;
     statusBadgeClass = 'bg-[#EAF2F8] text-[#28618F]';
     buttonLabel = 'Check-out Pulang';
     buttonIcon = LogOut;
@@ -423,7 +423,7 @@ export const TraineeDashboard: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2">
                   {(['WFO', 'WFH'] as const).map(mode => (
                     <button key={mode} type="button" aria-pressed={(todayRecord?.workMode || workMode) === mode} onClick={() => setWorkMode(mode)} className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition ${(todayRecord?.workMode || workMode) === mode ? 'border-[#28618F] bg-[#EAF2F8] text-[#28618F]' : 'border-[#E4EAF0] bg-white text-[#6F7F8D]'} disabled:cursor-not-allowed disabled:opacity-70`}>
-                      {mode === 'WFO' ? 'WFO · Kantor Bandung' : 'WFH · Kerja dari rumah'}
+                      {mode === 'WFO' ? 'WFO · Kantor Bandung' : 'WFA / WFH · Kerja Fleksibel'}
                     </button>
                   ))}
                 </div>
@@ -431,7 +431,13 @@ export const TraineeDashboard: React.FC = () => {
             )}
             <div className="mb-3 flex items-start gap-2 rounded-xl border border-[#C8DCEB] bg-[#EEF6FB] px-3.5 py-3 text-xs text-[#28618F]">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{(todayRecord?.workMode || workMode) === 'WFO' ? `GPS harus berada dalam radius ${settings.officeLocation.radiusMeters} m dari ${settings.officeLocation.name}.` : 'Mode WFH: lokasi GPS tetap direkam, tanpa batas jarak dari kantor.'}</span>
+              <span>
+                {isCheckedIn
+                  ? 'Check-out: Lokasi GPS tetap direkam tanpa batasan radius kantor (bisa check-out dari mana saja seperti WFA).'
+                  : (todayRecord?.workMode || workMode) === 'WFO'
+                    ? `Check-in WFO: GPS harus berada dalam radius ${settings.officeLocation.radiusMeters} m dari ${settings.officeLocation.name}.`
+                    : 'Mode WFA / WFH: Lokasi GPS tetap direkam, tanpa batas jarak dari kantor.'}
+              </span>
             </div>
             {locationError && (
               <p role="alert" className="mb-3 rounded-xl border border-[#E3C4D0] bg-[#FCF3F6] px-3.5 py-3 text-xs font-semibold text-[#B84469]">{locationError}</p>
@@ -538,7 +544,7 @@ export const TraineeDashboard: React.FC = () => {
                     {todayRecord?.checkOutTime ? `${todayRecord.checkOutTime} WIB` : 'Menunggu check-out'}
                   </p>
                   <p className="mt-0.5 text-xs text-[#6F7F8D]">
-                    Lakukan check-out saat aktivitas selesai.
+                    {todayRecord?.checkOutTime ? 'Check-out telah berhasil tercatat.' : 'Lakukan check-out saat aktivitas selesai (lokasi GPS tercatat tanpa batasan radius).'}
                   </p>
                   {todayRecord?.checkOutCoordinates && (
                     <a className="mt-1 inline-flex text-xs font-semibold text-[#28618F] hover:underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${todayRecord.checkOutCoordinates.lat},${todayRecord.checkOutCoordinates.lng}`}>

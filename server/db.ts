@@ -187,6 +187,11 @@ async function backfillLatePenalties(p: mysql.Pool) {
 }
 
 export async function initDatabase() {
+  const dbConfig = describeDatabaseConfig();
+  if (!dbConfig.ok) {
+    console.warn(`[TiDB Warning] Konfigurasi TiDB belum diatur di .env (missing: ${dbConfig.missing.join(', ')}). Inisialisasi database dilewati.`);
+    return;
+  }
   const { database } = getDbConfig();
   const p = getPool();
   console.log(`[TiDB] Memeriksa tabel aplikasi pada database ${database}...`);

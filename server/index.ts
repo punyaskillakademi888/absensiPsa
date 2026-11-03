@@ -1286,25 +1286,32 @@ app.patch('/api/leaves/:id/review', authenticateToken, authorizeRoles('mentor'),
   }
 });
 
-// Start server after initializing TiDB
+// Start server
 async function startServer() {
-  try {
-    await initDatabase();
-    const server = app.listen(PORT, () => {
-      console.log(`[Server] Auth & TiDB API running on port ${PORT}`);
-      console.log(`[Server] TiDB connected and 3 Roles seeded: Admin, Mentor, Trainee`);
-    });
-    server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`[Server Error] Port ${PORT} sedang dipakai proses lain. Hentikan server lama yang memakai port ini, lalu jalankan npm run server lagi.`);
-      } else {
-        console.error('[Server Error] Gagal membuka HTTP server:', err);
-      }
-      process.exit(1);
-    });
-  } catch (err) {
-    console.error('[Server Error] Failed to initialize TiDB:', err);
+  const server = app.listen(PORT, () => {
+    console.log(`[Server] Auth & API running on port ${PORT}`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[Server Error] Port ${PORT} sedang dipakai proses lain. Hentikan server lama yang memakai port ini, lalu jalankan npm run server lagi.`);
+    } else {
+      console.error('[Server Error] Gagal membuka HTTP server:', err);
+    }
     process.exit(1);
+  });
+
+  try {
+    const dbConfig = describeDatabaseConfig();
+    if (!dbConfig.ok) {
+      console.warn(`[Server Warning] Konfigurasi TiDB belum diatur di .env (${dbConfig.missing.join(', ')}). Server tetap berjalan.`);
+    } else {
+      await initDatabase();
+      console.log(`[Server] TiDB connected and 3 Roles seeded: Admin, Mentor, Trainee`);
+    }
+  } catch (err) {
+    console.error('[Server Warning] Gagal menghubungkan ke TiDB saat startup:', err);
+    console.warn(`[Server] Server tetap berjalan pada port ${PORT}.`);
   }
 }
 

@@ -255,7 +255,7 @@ export const SettingsView: React.FC = () => {
               </button>
               <a className="text-xs font-semibold text-[#28618F] hover:underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${officeLat},${officeLng}`}>Cek pin di Google Maps</a>
               {locationError && <p role="alert" className="w-full text-xs font-semibold text-[#B84469]">{locationError}</p>}
-              <p className="w-full text-[11px] leading-relaxed text-[#6F7F8D]">Admin perlu mengatur pin ini satu kali saat berada tepat di lokasi Punya Skill Akademi. Presensi WFO memakai pin ini dengan radius 100 m.</p>
+              <p className="w-full text-[11px] leading-relaxed text-[#6F7F8D]">Admin perlu mengatur pin ini satu kali saat berada tepat di lokasi Punya Skill Akademi. Check-in WFO memakai pin ini dengan radius geofence (check-out WFO fleksibel tanpa batasan radius seperti WFA).</p>
             </div>
           </div>
         </div>

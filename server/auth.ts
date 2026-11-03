@@ -25,6 +25,7 @@ export interface UserTokenPayload {
   nim: string;
   name: string;
   role: Role;
+  avatar?: string | null;
   kejuruanId?: string | null;
   kejuruanName?: string | null;
   loginCode?: string;

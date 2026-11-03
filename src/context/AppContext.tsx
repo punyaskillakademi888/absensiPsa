@@ -624,7 +624,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Clock Out
-  const clockOut = async (notes?: string, coordinates?: { lat: number; lng: number }, workMode?: 'WFO' | 'WFH'): Promise<{ success: boolean; message: string }> => {
+  // Konsep check-out WFO disamakan seperti check-out WFA/WFH:
+  // Koordinat GPS tetap dicatat tanpa batasan radius kantor, sehingga peserta/mentor dapat check-out dari mana saja.
+  const clockOut = async (notes?: string, coordinates?: { lat: number; lng: number }, _workMode?: 'WFO' | 'WFH'): Promise<{ success: boolean; message: string }> => {
     const today = getTodayDateString();
     const existing = getTodayRecordForUser(currentUser.id);
 
@@ -634,17 +636,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (existing.checkOutTime) {
       return { success: false, message: 'Anda sudah melakukan Check-Out sebelumnya.' };
-    }
-
-    if (coordinates && (workMode || existing.workMode || 'WFO') === 'WFO') {
-      const toRadians = (degrees: number) => degrees * Math.PI / 180;
-      const dLat = toRadians(coordinates.lat - settings.officeLocation.lat);
-      const dLng = toRadians(coordinates.lng - settings.officeLocation.lng);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(settings.officeLocation.lat)) * Math.cos(toRadians(coordinates.lat)) * Math.sin(dLng / 2) ** 2;
-      const distance = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      if (distance > settings.officeLocation.radiusMeters) {
-        return { success: false, message: `Lokasi Anda sekitar ${Math.round(distance)} m dari ${settings.officeLocation.name}. Presensi hanya dapat dilakukan dalam radius ${settings.officeLocation.radiusMeters} m.` };
-      }
     }
 
     const currentTime = getCurrentTimeWIB();
