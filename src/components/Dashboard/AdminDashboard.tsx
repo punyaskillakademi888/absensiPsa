@@ -17,6 +17,7 @@ import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB } from '../
 import { AttendanceStatus } from '../../types';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
+import { DEFAULT_PAGE_SIZE, Pagination } from '../Pagination';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -38,6 +39,8 @@ export const AdminDashboard: React.FC = () => {
   const [selectedKejuruanFilter, setSelectedKejuruanFilter] = useState<string>('all');
   const [activeAdminView, setActiveAdminView] = useState<'mentors' | 'trainees'>('mentors');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [mentorPage, setMentorPage] = useState(1);
+  const [mentorPageSize, setMentorPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     const refresh = () => void refreshAttendanceRecords();
@@ -80,6 +83,17 @@ export const AdminDashboard: React.FC = () => {
       };
     });
   }, [mentors, attendanceRecords, today]);
+  const mentorTotalPages = Math.max(1, Math.ceil(mentorTodayRecords.length / mentorPageSize));
+  const currentMentorPage = Math.min(mentorPage, mentorTotalPages);
+  const mentorStartIndex = (currentMentorPage - 1) * mentorPageSize;
+  const paginatedMentorRecords = useMemo(
+    () => mentorTodayRecords.slice(mentorStartIndex, mentorStartIndex + mentorPageSize),
+    [mentorTodayRecords, mentorStartIndex, mentorPageSize]
+  );
+
+  useEffect(() => {
+    setMentorPage(1);
+  }, [mentorPageSize]);
 
   // Mentor stats
   const mentorStats = useMemo(() => {
@@ -400,7 +414,7 @@ export const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E4EAF0]">
-                  {mentorTodayRecords.map(({ mentor, record }) => {
+                  {paginatedMentorRecords.map(({ mentor, record }) => {
                     const isPending = record && record.verificationStatus === 'pending';
                     const isVerified = record && record.verificationStatus === 'verified';
                     const notCheckedIn = !record || !record.checkInTime;
@@ -565,6 +579,16 @@ export const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={currentMentorPage}
+              totalPages={mentorTotalPages}
+              totalItems={mentorTodayRecords.length}
+              pageSize={mentorPageSize}
+              startIndex={mentorStartIndex}
+              itemLabel="mentor"
+              onPageChange={setMentorPage}
+              onPageSizeChange={setMentorPageSize}
+            />
           </div>
         </div>
       )}

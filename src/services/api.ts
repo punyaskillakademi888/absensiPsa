@@ -87,6 +87,17 @@ export const api = {
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
+      const isLocal = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      );
+      if (isLocal) {
+        throw new Error(
+          response.status === 404
+            ? 'Endpoint API lokal tidak ditemukan (404). Silakan restart server backend lokal (npm run server) agar membaca kode rute terbaru.'
+            : `Server backend lokal tidak merespons JSON (HTTP ${response.status}). Pastikan backend berjalan pada port 5000.`
+        );
+      }
       throw new Error(
         response.status === 404
           ? 'API Vercel tidak ditemukan. Redeploy project setelah perubahan folder api/.'
@@ -344,6 +355,16 @@ export const api = {
     });
   },
 
+  async submitMissionWork(id: string, submission: {
+    submissionLink?: string;
+    notes: string;
+  }): Promise<{ success: boolean; message: string; submission: MissionSubmission }> {
+    return this.request<{ success: boolean; message: string; submission: MissionSubmission }>(
+      `/api/missions/${encodeURIComponent(id)}/submissions`,
+      { method: 'POST', body: JSON.stringify(submission) }
+    );
+  },
+
   async updateMission(id: string, updates: Partial<Mission>): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>(`/api/missions/${encodeURIComponent(id)}`, {
       method: 'PUT',
@@ -360,7 +381,6 @@ export const api = {
   async reviewMissionSubmission(id: string, review: {
     status: 'approved' | 'rejected';
     feedback: string;
-    points: number;
   }): Promise<{ success: boolean; message: string; submission: MissionSubmission }> {
     return this.request<{ success: boolean; message: string; submission: MissionSubmission }>(`/api/missions/submissions/${encodeURIComponent(id)}/review`, {
       method: 'PATCH',

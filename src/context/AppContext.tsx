@@ -74,12 +74,11 @@ interface AppContextType {
     missionId: string;
     submissionLink?: string;
     notes: string;
-  }) => { success: boolean; message: string };
+  }) => Promise<{ success: boolean; message: string }>;
   reviewMissionSubmission: (
     submissionId: string,
     status: 'approved' | 'rejected',
-    feedback?: string,
-    awardedPoints?: number
+    feedback?: string
   ) => Promise<void>;
   getUserPoints: (userId: string) => number;
   // Total poin yang dipotong karena keterlambatan check-in peserta.
@@ -150,6 +149,19 @@ function mergeSavedRows<T extends { id: string }>(saved: T[], updated: T[]): T[]
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+
+export const syncMissionsStatus = (rawMissions: Mission[], rawSubmissions: MissionSubmission[]): Mission[] => {
+  const today = getTodayDateString();
+  return rawMissions.map(m => {
+    const isPastDue = Boolean(m.dueDate && m.dueDate < today);
+    const hasSubmission = rawSubmissions.some(s => s.missionId === m.id);
+    if (m.status === 'active' && (isPastDue || hasSubmission)) {
+      return { ...m, status: 'archived' };
+    }
+    return m;
+  });
+};
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>([]);
@@ -528,6 +540,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (existing && existing.checkInTime) {
       return { success: false, message: 'Anda sudah melakukan Check-In untuk hari ini!' };
+    }
+
+    if (getCurrentTimeWIB() >= '19:00:00') {
+      return { success: false, message: 'Batas check-in hari ini sudah berakhir pukul 19.00 WIB.' };
     }
 
     if (coordinates && workMode === 'WFO') {
@@ -1033,7 +1049,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await api.getAppData();
       if (res.success) {
-        setMissions(previous => JSON.stringify(previous) === JSON.stringify(res.missions) ? previous : res.missions);
+        const synced = syncMissionsStatus(res.missions, missionSubmissions);
+        setMissions(previous => JSON.stringify(previous) === JSON.stringify(synced) ? previous : synced);
         setMissionSubmissions(previous => JSON.stringify(previous) === JSON.stringify(res.missionSubmissions) ? previous : res.missionSubmissions);
       }
     } catch (error) {
@@ -1094,26 +1111,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMissions(prev => prev.filter(m => m.id !== id));
   };
 
-  const submitMissionWork = (data: {
+  const submitMissionWork = async (data: {
     missionId: string;
     submissionLink?: string;
     notes: string;
-  }) => {
+  }): Promise<{ success: boolean; message: string }> => {
     const targetMission = missions.find(m => m.id === data.missionId);
     if (!targetMission) {
-      return { success: false, message: 'Misi tidak ditemukan' };
+      return { success: false, message: 'Misi tidak ditemukan.' };
+    }
+    const today = getTodayDateString();
+    const isPastDue = Boolean(targetMission.dueDate && targetMission.dueDate < today);
+    if (targetMission.status !== 'active' || isPastDue) {
+      return { success: false, message: 'Batas waktu misi sudah terlewat atau misi telah ditutup.' };
     }
 
-    const existing = missionSubmissions.find(
-      s => s.missionId === data.missionId && s.traineeId === currentUser.id
-    );
-
-    if (existing && existing.status === 'approved') {
-      return { success: false, message: 'Anda sudah menyelesaikan misi ini dan poin telah diterima.' };
+    // Periksa apakah misi sudah dikerjakan oleh peserta magang mana pun
+    const existingByAnyone = missionSubmissions.find(s => s.missionId === data.missionId);
+    if (existingByAnyone) {
+      setMissions(prev => prev.map(m => m.id === targetMission.id ? { ...m, status: 'archived' } : m));
+      return { success: false, message: 'Misi ini sudah dikerjakan oleh peserta magang lain dan telah ditutup.' };
     }
+
+    const awardedPoints = Number(targetMission.points) || 0;
+    const submittedTime = `${today} ${getCurrentTimeWIB()}`;
 
     const newSubmission: MissionSubmission = {
-      id: existing ? existing.id : `sub-${Date.now()}`,
+      id: `sub-${Date.now()}`,
       missionId: targetMission.id,
       missionTitle: targetMission.title,
       traineeId: currentUser.id,
@@ -1124,57 +1148,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       kejuruanName: targetMission.kejuruanName,
       submissionLink: data.submissionLink,
       notes: data.notes,
-      points: targetMission.points,
-      submittedAt: `${getTodayDateString()} ${getCurrentTimeWIB()}`,
-      status: 'pending'
+      points: awardedPoints, // Poin otomatis sesuai misi
+      submittedAt: submittedTime,
+      status: 'approved', // Status otomatis disetujui
+      reviewedBy: 'Sistem',
+      reviewedAt: submittedTime,
+      feedback: 'Poin misi otomatis diberikan setelah tugas dikirim.'
     };
 
-    if (existing) {
-      setMissionSubmissions(prev => prev.map(s => (s.id === existing.id ? newSubmission : s)));
-    } else {
-      setMissionSubmissions(prev => [newSubmission, ...prev]);
+    let savedSubmission = newSubmission;
+    if (jwtToken) {
+      const response = await api.submitMissionWork(targetMission.id, {
+        submissionLink: data.submissionLink,
+        notes: data.notes,
+      });
+      if (!response.success) {
+        return { success: false, message: response.message || 'Pengumpulan misi gagal disimpan.' };
+      }
+      if (response.submission) {
+        savedSubmission = response.submission;
+      }
     }
+
+    // Update state submission
+    setMissionSubmissions(prev => [savedSubmission, ...prev.filter(s => s.id !== savedSubmission.id)]);
+
+    // Otomatis tutup misi agar tidak dapat dikerjakan oleh peserta magang lain
+    setMissions(prev => prev.map(m => m.id === targetMission.id ? { ...m, status: 'archived' } : m));
 
     try {
       confetti({
-        particleCount: 50,
-        spread: 60,
+        particleCount: 60,
+        spread: 70,
         origin: { y: 0.7 }
       });
     } catch {
       // Ignored
     }
 
-    return { success: true, message: 'Tugas misi berhasil dikirimkan ke Mentor untuk direview!' };
+    return {
+      success: true,
+      message: `Tugas misi berhasil dikirim! Selamat, +${awardedPoints} poin otomatis diberikan ke akun Anda.`,
+    };
   };
 
   const reviewMissionSubmission = async (
     submissionId: string,
     status: 'approved' | 'rejected',
-    feedback?: string,
-    awardedPoints?: number
+    feedback?: string
   ) => {
     if (!jwtToken) throw new Error('Sesi tidak aktif. Silakan masuk kembali.');
     const submission = missionSubmissions.find(item => item.id === submissionId);
     if (!submission) throw new Error('Data pengumpulan tugas tidak ditemukan.');
 
-    const reviewPoints = awardedPoints !== undefined ? awardedPoints : submission.points;
     const reviewFeedback = feedback || '';
     const response = await api.reviewMissionSubmission(submissionId, {
       status,
       feedback: reviewFeedback,
-      points: reviewPoints,
     });
     if (!response.success) throw new Error(response.message || 'Review gagal disimpan.');
 
     setMissionSubmissions(previous => previous.map(item => item.id === submissionId
-      ? response.submission || {
-          ...item,
-          status,
-          points: reviewPoints,
-          reviewedBy: currentUser.name,
-          feedback: reviewFeedback,
-        }
+      ? response.submission
       : item
     ));
 

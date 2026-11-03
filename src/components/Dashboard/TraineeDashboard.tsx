@@ -23,7 +23,8 @@ import {
   formatIndonesianDate,
   formatShortDate,
   INDONESIAN_MONTHS,
-  INDONESIAN_DAYS
+  INDONESIAN_DAYS,
+  getCurrentTimeWIB
 } from '../../utils/dateUtils';
 import { exportToPDF } from '../../utils/exportUtils';
 
@@ -53,10 +54,9 @@ export const TraineeDashboard: React.FC = () => {
   const [workMode, setWorkMode] = useState<'WFO' | 'WFH'>(todayRecord?.workMode || 'WFO');
 
   const isCheckedIn = !!todayRecord?.checkInTime;
-  const isCheckedOut = !!todayRecord?.checkOutTime;
-
-  // Detect if current time is past check-in limit (late warning before check-in)
   const [isCurrentlyLate, setIsCurrentlyLate] = useState(false);
+  const [isCheckInClosed, setIsCheckInClosed] = useState(false);
+  const isCheckedOut = !!todayRecord?.checkOutTime || (isCheckedIn && isCheckInClosed);
 
   // Assigned kejuruan & mentor name
   const myKejuruan = kejuruanList.find(k => k.id === currentUser.kejuruanId);
@@ -111,16 +111,14 @@ export const TraineeDashboard: React.FC = () => {
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
+      const [hh, mm, ss] = getCurrentTimeWIB().split(':');
       const timeStr = `${hh}.${mm}.${ss}`;
       setLiveTime(timeStr);
       // Bandingkan HH:MM dengan batas toleransi dari pengaturan admin (mis. 09:00)
       const currentHHMM = `${hh}:${mm}`;
       const lateLimitHHMM = String(settings.lateLimitTime || '09:00').slice(0, 5);
       setIsCurrentlyLate(currentHHMM > lateLimitHHMM);
+      setIsCheckInClosed(currentHHMM >= '19:00');
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -198,7 +196,6 @@ export const TraineeDashboard: React.FC = () => {
   let statusHelper = 'Belum ada catatan kehadiran hari ini. Silakan lakukan check-in.';
   let statusBadgeClass = 'bg-[#F4F6F8] text-[#6F7F8D]';
   let buttonLabel = 'Check-in Sekarang';
-  let buttonIcon = LogIn;
   let isButtonDisabled = false;
 
   if (todayLeave) {
@@ -209,17 +206,21 @@ export const TraineeDashboard: React.FC = () => {
     isButtonDisabled = true;
   } else if (isCheckedOut) {
     statusText = 'Presensi Selesai';
-    statusHelper = `Check-out tercatat pukul ${todayRecord?.checkOutTime} WIB. Sesi hari ini telah selesai.`;
+    statusHelper = `Check-out tercatat pukul ${todayRecord?.checkOutTime || '19:00:00'} WIB. Sesi hari ini telah selesai.`;
     statusBadgeClass = 'bg-[#EAF2F8] text-[#28618F]';
     buttonLabel = 'Presensi Hari Ini Selesai';
-    buttonIcon = Check;
+    isButtonDisabled = true;
+  } else if (isCheckInClosed) {
+    statusText = 'Check-in Ditutup';
+    statusHelper = 'Batas check-in hari ini sudah berakhir pukul 19.00 WIB.';
+    statusBadgeClass = 'bg-[#F4F6F8] text-[#6F7F8D]';
+    buttonLabel = 'Check-in Ditutup';
     isButtonDisabled = true;
   } else if (isCheckedIn) {
     statusText = 'Sudah Check-in';
-    statusHelper = `Masuk tercatat pukul ${todayRecord?.checkInTime} WIB. Jangan lupa check-out saat jam pulang (bisa dari mana saja).`;
+    statusHelper = `Masuk tercatat pukul ${todayRecord?.checkInTime} WIB. Jika belum check-out, sistem akan otomatis mencatatnya pukul 19.00 WIB.`;
     statusBadgeClass = 'bg-[#EAF2F8] text-[#28618F]';
     buttonLabel = 'Check-out Pulang';
-    buttonIcon = LogOut;
   }
 
   return (
@@ -450,7 +451,7 @@ export const TraineeDashboard: React.FC = () => {
                 className="w-full flex items-center justify-center gap-3 rounded-xl px-5 py-4 font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed bg-[#123B59] hover:bg-[#0D2F47] cursor-pointer shadow-sm"
               >
                 <LogIn className="h-5 w-5" />
-                <span>{isLocating ? 'Mendeteksi lokasi...' : 'Check-in Sekarang'}</span>
+                <span>{isLocating ? 'Mendeteksi lokasi...' : buttonLabel}</span>
                 <span className="ml-1 h-2 w-2 rounded-full bg-[#D95B83]"></span>
               </button>
             ) : !isCheckedOut ? (

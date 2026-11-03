@@ -112,6 +112,7 @@ export const MissionManagementView: React.FC = () => {
       : isTrainee ? currentUser.kejuruanId || 'all' : 'all'
   );
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'all' | 'active' | 'closed'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedMissionDescriptionId, setExpandedMissionDescriptionId] = useState<string | null>(null);
   const [expandedSubmissionGuideId, setExpandedSubmissionGuideId] = useState<string | null>(null);
@@ -146,7 +147,6 @@ export const MissionManagementView: React.FC = () => {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedSubmissionForReview, setSelectedSubmissionForReview] = useState<MissionSubmission | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
-  const [reviewAwardedPoints, setReviewAwardedPoints] = useState<number>(100);
   const [isReviewSaving, setIsReviewSaving] = useState(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -159,6 +159,13 @@ export const MissionManagementView: React.FC = () => {
   // Filter missions
   const filteredMissions = useMemo(() => {
     return missions.filter(m => {
+      const isPastDue = Boolean(m.dueDate && m.dueDate < getTodayDateString());
+      const hasSubmission = missionSubmissions.some(s => s.missionId === m.id);
+      const isClosed = m.status === 'archived' || isPastDue || hasSubmission;
+
+      if (selectedStatusFilter === 'active' && isClosed) return false;
+      if (selectedStatusFilter === 'closed' && !isClosed) return false;
+
       const selectedOption = getKejuruanFilterOptions(kejuruanList).find(option => option.value === selectedKejuruanFilter);
       const selectedProgram = kejuruanList.find(program => program.id === (selectedOption?.programId || selectedKejuruanFilter));
       const selectedProgramName = selectedOption?.name || (isTrainee || isMentor
@@ -184,7 +191,7 @@ export const MissionManagementView: React.FC = () => {
       }
       return true;
     });
-  }, [missions, isMentor, isTrainee, currentUser.kejuruanName, kejuruanList, mentorKejuruanIds, mentorProgramNames, selectedKejuruanFilter, selectedDifficulty, searchQuery]);
+  }, [missions, missionSubmissions, isMentor, currentUser.kejuruanName, kejuruanList, mentorKejuruanIds, mentorProgramNames, selectedKejuruanFilter, selectedDifficulty, selectedStatusFilter, searchQuery]);
 
   // Submissions filtered for Mentor / Admin
   const relevantSubmissions = useMemo(() => {
@@ -341,6 +348,13 @@ export const MissionManagementView: React.FC = () => {
 
   // Trainee Submission Modal
   const handleOpenSubmitModal = (m: Mission) => {
+    const today = getTodayDateString();
+    const isPastDue = Boolean(m.dueDate && m.dueDate < today);
+    const anySub = missionSubmissions.find(s => s.missionId === m.id);
+    if (m.status === 'archived' || isPastDue || anySub) {
+      showToast('Misi ini sudah ditutup dan tidak dapat dikerjakan.');
+      return;
+    }
     setTargetMissionForSubmit(m);
     setSubmissionLink('');
     setSubmissionNotes('');
@@ -348,25 +362,38 @@ export const MissionManagementView: React.FC = () => {
     setIsSubmitModalOpen(true);
   };
 
-  const handleSubmitWork = (e: React.FormEvent) => {
+  const handleSubmitWork = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetMissionForSubmit) return;
+
+    const today = getTodayDateString();
+    const isPastDue = Boolean(targetMissionForSubmit.dueDate && targetMissionForSubmit.dueDate < today);
+    const anySub = missionSubmissions.find(s => s.missionId === targetMissionForSubmit.id);
+    if (targetMissionForSubmit.status === 'archived' || isPastDue || anySub) {
+      setSubmitError('Misi ini sudah ditutup atau telah dikerjakan oleh peserta magang lain.');
+      return;
+    }
+
     if (!submissionNotes.trim()) {
       setSubmitError('Catatan hasil pengerjaan wajib diisi.');
       return;
     }
 
-    const res = submitMissionWork({
-      missionId: targetMissionForSubmit.id,
-      submissionLink: submissionLink.trim() || undefined,
-      notes: submissionNotes.trim()
-    });
+    try {
+      const res = await submitMissionWork({
+        missionId: targetMissionForSubmit.id,
+        submissionLink: submissionLink.trim() || undefined,
+        notes: submissionNotes.trim()
+      });
 
-    if (res.success) {
-      showToast(res.message);
-      setIsSubmitModalOpen(false);
-    } else {
-      setSubmitError(res.message);
+      if (res.success) {
+        showToast(res.message);
+        setIsSubmitModalOpen(false);
+      } else {
+        setSubmitError(res.message);
+      }
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Pengumpulan misi gagal disimpan.');
     }
   };
 
@@ -374,7 +401,6 @@ export const MissionManagementView: React.FC = () => {
   const handleOpenReviewModal = (submission: MissionSubmission) => {
     setSelectedSubmissionForReview(submission);
     setReviewFeedback(submission.feedback || '');
-    setReviewAwardedPoints(submission.points);
     setIsReviewModalOpen(true);
   };
 
@@ -385,12 +411,11 @@ export const MissionManagementView: React.FC = () => {
       await reviewMissionSubmission(
         selectedSubmissionForReview.id,
         status,
-        reviewFeedback.trim() || (status === 'approved' ? 'Tugas disetujui dengan predikat memuaskan.' : 'Perlu perbaikan sesuai arahan instruktur.'),
-        Number(reviewAwardedPoints)
+        reviewFeedback.trim() || (status === 'approved' ? 'Tugas disetujui dengan predikat memuaskan.' : 'Perlu perbaikan sesuai arahan instruktur.')
       );
       showToast(
         status === 'approved'
-          ? `Tugas disetujui! ${reviewAwardedPoints} poin berhasil diberikan kepada ${selectedSubmissionForReview.traineeName}.`
+          ? `Tugas disetujui! ${missions.find(mission => mission.id === selectedSubmissionForReview.missionId)?.points ?? selectedSubmissionForReview.points} poin berhasil diberikan kepada ${selectedSubmissionForReview.traineeName}.`
           : `Tugas peserta ${selectedSubmissionForReview.traineeName} telah ditolak dengan catatan evaluasi.`
       );
       setIsReviewModalOpen(false);
@@ -571,6 +596,19 @@ export const MissionManagementView: React.FC = () => {
             </select>
           )}
 
+          {/* Status Filter */}
+          {!isAdmin && (
+            <select
+              value={selectedStatusFilter}
+              onChange={e => setSelectedStatusFilter(e.target.value as any)}
+              className="text-xs py-1.5 px-2.5 rounded-lg border border-[#E4EAF0] bg-[#F4F6F8] text-[#123B59] outline-none"
+            >
+              <option value="all">Semua Status</option>
+              <option value="active">Berlangsung</option>
+              <option value="closed">Ditutup</option>
+            </select>
+          )}
+
           {/* Difficulty Filter */}
           {!isAdmin && (
             <select
@@ -609,19 +647,26 @@ export const MissionManagementView: React.FC = () => {
                   )
                 : null;
 
-              const isCompleted = mySubmission?.status === 'approved';
-              const isPending = mySubmission?.status === 'pending';
-              const isRejected = mySubmission?.status === 'rejected';
+              // Check if ANY submission exists for this mission (from anyone)
+              const anySubmission = missionSubmissions.find(
+                s => s.missionId === mission.id
+              );
 
-              // Total submissions count across trainees
-              const totalSubs = missionSubmissions.filter(s => s.missionId === mission.id);
-              const approvedSubs = totalSubs.filter(s => s.status === 'approved').length;
+              const isPastDue = Boolean(mission.dueDate && mission.dueDate < getTodayDateString());
+              const isClosed = mission.status === 'archived' || isPastDue || Boolean(anySubmission);
+
+              const isCompletedByMe = Boolean(mySubmission);
+              const isCompletedByOther = !isCompletedByMe && Boolean(anySubmission);
 
               return (
                 <div
                   key={mission.id}
                   className={`surface soft-hover rounded-2xl flex flex-col justify-between p-4 ${
-                    isCompleted ? 'border-emerald-300 bg-emerald-50/10' : ''
+                    isCompletedByMe
+                      ? 'border-emerald-300 bg-emerald-50/10'
+                      : isClosed
+                      ? 'border-[#E4EAF0] opacity-95'
+                      : ''
                   }`}
                 >
                   <div>
@@ -631,6 +676,18 @@ export const MissionManagementView: React.FC = () => {
                         {mission.kejuruanName}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Status Badge for Mentor & Trainee */}
+                        {isClosed ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#FCF3F6] text-[#B84469] border border-[#D95B83]/20 flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" />
+                            <span>Ditutup</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            <span>Berlangsung</span>
+                          </span>
+                        )}
                         {getDifficultyBadge(mission.difficulty)}
                         <span className="px-2 py-0.5 rounded-full text-xs font-bold font-mono bg-[#123B59] text-white flex items-center gap-1">
                           <Award className="w-3 h-3" />
@@ -692,32 +749,36 @@ export const MissionManagementView: React.FC = () => {
                         <Clock className="w-3 h-3" />
                         <span>Batas: {mission.dueDate || 'Sesuai Jadwal'}</span>
                       </span>
-                      <span>{approvedSubs} peserta selesai</span>
+                      <span>
+                        {anySubmission
+                          ? `Diselesaikan (${anySubmission.traineeName})`
+                          : isPastDue || mission.status === 'archived'
+                          ? 'Ditutup'
+                          : 'Tersedia untuk 1 peserta'}
+                      </span>
                     </div>
 
                     {/* Trainee Actions */}
                     {isTrainee && (
                       <div>
-                        {isCompleted ? (
+                        {isCompletedByMe ? (
                           <div className="w-full py-2 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5 border border-emerald-200">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Misi Selesai (+{mySubmission.points} Pts Diperoleh)</span>
+                            <span>Misi Selesai (+{mySubmission?.points ?? mission.points} Pts Diperoleh)</span>
                           </div>
-                        ) : isPending ? (
-                          <div className="w-full py-2 px-3 rounded-xl bg-[#FFF5E6] text-[#C05621] border border-orange-200 text-xs font-semibold flex items-center justify-center gap-1.5">
-                            <Clock className="w-4 h-4" />
-                            <span>Menunggu Review Mentor</span>
+                        ) : isCompletedByOther ? (
+                          <div className="w-full py-2 px-3 rounded-xl bg-[#F4F6F8] text-[#6F7F8D] text-xs font-semibold flex items-center justify-center gap-1.5 border border-[#E4EAF0]">
+                            <AlertCircle className="w-4 h-4 text-[#A9C7DE] shrink-0" />
+                            <span>Misi Ditutup (Dikerjakan oleh {anySubmission?.traineeName})</span>
                           </div>
-                        ) : isRejected ? (
-                          <button
-                            onClick={() => handleOpenSubmitModal(mission)}
-                            className="w-full py-2 px-3 rounded-xl bg-[#FCF3F6] hover:bg-[#D95B83] hover:text-white text-[#B84469] text-xs font-semibold flex items-center justify-center gap-1.5 border border-[#D95B83]/30 transition cursor-pointer"
-                          >
-                            <Send className="w-3.5 h-3.5" />
-                            <span>Revisi &amp; Kirim Ulang Tugas</span>
-                          </button>
+                        ) : isPastDue || mission.status === 'archived' ? (
+                          <div className="w-full py-2 px-3 rounded-xl bg-[#FCF3F6] text-[#B84469] text-xs font-semibold flex items-center justify-center gap-1.5 border border-[#D95B83]/30">
+                            <Clock className="w-4 h-4 shrink-0" />
+                            <span>Misi Ditutup (Batas Waktu Terlewat)</span>
+                          </div>
                         ) : (
                           <button
+                            type="button"
                             onClick={() => handleOpenSubmitModal(mission)}
                             className="w-full py-2 px-3 rounded-xl bg-[#123B59] hover:bg-[#0D2F47] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
                           >
@@ -726,10 +787,10 @@ export const MissionManagementView: React.FC = () => {
                           </button>
                         )}
 
-                        {/* If feedback exists from mentor */}
+                        {/* If feedback exists from mentor / system */}
                         {mySubmission?.feedback && (
                           <div className="mt-2 p-2 rounded-lg bg-[#F4F6F8] border border-[#E4EAF0] text-[11px] text-[#6F7F8D]">
-                            <strong className="text-[#123B59]">Catatan Mentor:</strong> {mySubmission.feedback}
+                            <strong className="text-[#123B59]">Catatan:</strong> {mySubmission.feedback}
                           </div>
                         )}
                       </div>
@@ -737,25 +798,41 @@ export const MissionManagementView: React.FC = () => {
 
                     {/* Mentor / Admin Actions */}
                     {(isMentor || isAdmin) && (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-[#A9C7DE] truncate">
-                          Oleh: {mission.mentorName}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleOpenEditModal(mission)}
-                            className="p-1.5 rounded-lg text-[#6F7F8D] hover:text-[#4C83B5] hover:bg-[#EAF2F8] transition cursor-pointer"
-                            title="Edit Misi"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteMission(mission.id, mission.title)}
-                            className="p-1.5 rounded-lg text-[#6F7F8D] hover:text-[#D95B83] hover:bg-[#FCF3F6] transition cursor-pointer"
-                            title="Hapus Misi"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                      <div className="space-y-2">
+                        {anySubmission ? (
+                          <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center justify-between gap-1">
+                            <span className="truncate">
+                              Diselesaikan: <strong>{anySubmission.traineeName}</strong>
+                            </span>
+                            <span className="font-bold shrink-0 font-mono">+{anySubmission.points} Pts</span>
+                          </div>
+                        ) : isPastDue ? (
+                          <div className="p-2 rounded-lg bg-[#FCF3F6] border border-[#D95B83]/20 text-[11px] text-[#B84469] flex items-center gap-1">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span>Ditutup otomatis karena batas waktu terlewat.</span>
+                          </div>
+                        ) : null}
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-[#A9C7DE] truncate">
+                            Oleh: {mission.mentorName}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleOpenEditModal(mission)}
+                              className="p-1.5 rounded-lg text-[#6F7F8D] hover:text-[#4C83B5] hover:bg-[#EAF2F8] transition cursor-pointer"
+                              title="Edit Misi"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMission(mission.id, mission.title)}
+                              className="p-1.5 rounded-lg text-[#6F7F8D] hover:text-[#D95B83] hover:bg-[#FCF3F6] transition cursor-pointer"
+                              title="Hapus Misi"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1002,8 +1079,12 @@ export const MissionManagementView: React.FC = () => {
                     required
                     value={formPoints}
                     onChange={e => setFormPoints(Number(e.target.value))}
+                    disabled={!!editingMissionId}
                     className="w-full text-xs p-2.5 rounded-lg border border-[#E4EAF0] bg-white text-[#123B59] outline-none font-mono focus:ring-1 focus:ring-[#4C83B5]"
                   />
+                  {editingMissionId && (
+                    <p className="mt-1 text-[10px] text-[#6F7F8D]">Poin dikunci sesuai nilai saat misi dipublikasikan.</p>
+                  )}
                 </div>
 
                 <div>
@@ -1245,19 +1326,8 @@ export const MissionManagementView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#123B59] mb-1">
-                  Poin yang Diberikan
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={500}
-                  step={10}
-                  value={reviewAwardedPoints}
-                  onChange={e => setReviewAwardedPoints(Number(e.target.value))}
-                  className="w-full text-xs p-2.5 rounded-lg border border-[#E4EAF0] bg-white text-[#123B59] outline-none font-mono focus:ring-1 focus:ring-[#4C83B5]"
-                />
+              <div className="p-3 rounded-xl bg-[#EAF2F8] border border-[#A9C7DE]/40 text-xs text-[#123B59]">
+                Jika disetujui, peserta otomatis menerima <strong>+{missions.find(mission => mission.id === selectedSubmissionForReview.missionId)?.points ?? selectedSubmissionForReview.points} poin</strong> sesuai nilai yang ditetapkan saat misi dipublikasikan.
               </div>
 
               <div>

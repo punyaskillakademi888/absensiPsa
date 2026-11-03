@@ -234,6 +234,8 @@ export async function initDatabase() {
       id VARCHAR(64) PRIMARY KEY,
       user_id VARCHAR(64) NOT NULL,
       batch_id VARCHAR(64) NOT NULL,
+      kejuruan_id VARCHAR(64),
+      kejuruan_name VARCHAR(255),
       status ENUM('active','graduated','withdrawn') NOT NULL DEFAULT 'active',
       start_date DATE NOT NULL,
       end_date DATE,
@@ -414,6 +416,28 @@ export async function initDatabase() {
   for (const migration of tableMigrations) {
     await p.query(migration);
   }
+
+  const [batchEnrollmentProgramColumns] = await p.query<any[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'batch_enrollments'
+       AND COLUMN_NAME IN ('kejuruan_id', 'kejuruan_name')`,
+    [database]
+  );
+  const existingBatchEnrollmentProgramColumns = new Set(
+    batchEnrollmentProgramColumns.map((row: any) => String(row.COLUMN_NAME))
+  );
+  if (!existingBatchEnrollmentProgramColumns.has('kejuruan_id')) {
+    await p.query('ALTER TABLE batch_enrollments ADD COLUMN kejuruan_id VARCHAR(64) NULL AFTER batch_id');
+  }
+  if (!existingBatchEnrollmentProgramColumns.has('kejuruan_name')) {
+    await p.query('ALTER TABLE batch_enrollments ADD COLUMN kejuruan_name VARCHAR(255) NULL AFTER kejuruan_id');
+  }
+  await p.query(
+    `UPDATE batch_enrollments be
+     JOIN users u ON u.id = be.user_id
+     SET be.kejuruan_id = u.kejuruan_id, be.kejuruan_name = u.kejuruan_name
+     WHERE be.kejuruan_id IS NULL OR be.kejuruan_name IS NULL`
+  );
 
   const [leaveAttachmentColumns] = await p.query<any[]>(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS

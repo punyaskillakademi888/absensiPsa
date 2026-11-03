@@ -1,8 +1,16 @@
 import express, { Response } from 'express';
+import type { Pool, PoolConnection } from 'mysql2/promise';
+import { randomUUID } from 'node:crypto';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getPool, initDatabase, pingDatabase, describeDatabaseConfig, DbUser } from './db.js';
 import { appDataRouter } from './appData.js';
+import {
+  autoCheckoutAttendance,
+  completeExpiredBatchEnrollments,
+  getJakartaDateTime,
+} from './attendanceAutoCheckout.js';
+import { completeExpiredMissions } from './missionLifecycle.js';
 import { canonicalKejuruanCode } from './kejuruanCodes.js';
 import bcrypt from 'bcryptjs';
 import { createDirectUploadSignature, uploadToCloudinary, isCloudinaryConfigured } from './cloudinary.js';
@@ -43,6 +51,31 @@ interface BatchEnrollmentRow {
   batch_id: string;
   enrollment_status: 'active' | 'graduated' | 'withdrawn';
   batch_name: string | null;
+  kejuruan_id: string | null;
+  kejuruan_name: string | null;
+}
+
+async function enrollInCurrentBatch(
+  connection: Pool | PoolConnection,
+  userId: string,
+  kejuruanId: string | null,
+  kejuruanName: string | null,
+  joinedDate: string
+) {
+  await connection.query(
+    `INSERT INTO batch_enrollments (
+       id, user_id, batch_id, kejuruan_id, kejuruan_name, status, start_date
+     )
+     SELECT CONCAT('be-', LEFT(SHA2(CONCAT(?, ':', b.id), 256), 32)), ?, b.id, ?, ?, 'active', GREATEST(?, b.start_date)
+     FROM batches b
+     WHERE b.start_date <= CURDATE() AND b.end_date >= CURDATE()
+     ORDER BY b.start_date DESC
+     LIMIT 1
+     ON DUPLICATE KEY UPDATE
+       kejuruan_id = VALUES(kejuruan_id),
+       kejuruan_name = VALUES(kejuruan_name)`,
+    [userId, userId, kejuruanId, kejuruanName, joinedDate]
+  );
 }
 
 async function loadLatestBatchEnrollments(userIds: string[]) {
@@ -51,9 +84,12 @@ async function loadLatestBatchEnrollments(userIds: string[]) {
 
   const placeholders = uniqueUserIds.map(() => '?').join(', ');
   const [rows] = await getPool().query<any[]>(
-    `SELECT be.user_id, be.batch_id, be.status AS enrollment_status, b.name AS batch_name
+    `SELECT be.user_id, be.batch_id, be.status AS enrollment_status, b.name AS batch_name,
+            be.kejuruan_id, COALESCE(be.kejuruan_name, k.name) AS kejuruan_name
      FROM batch_enrollments be
+     JOIN users u ON u.id = be.user_id AND u.role = 'trainee'
      LEFT JOIN batches b ON b.id = be.batch_id
+     LEFT JOIN kejuruan k ON k.id = be.kejuruan_id
      WHERE be.user_id IN (${placeholders})
      ORDER BY be.user_id, be.start_date DESC, be.created_at DESC, be.id DESC`,
     uniqueUserIds
@@ -70,6 +106,76 @@ const configuredClientOrigins = (process.env.CLIENT_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
+
+function startAttendanceAutoCheckoutScheduler() {
+  let lastRunDate = '';
+  let isRunning = false;
+  const runIfDue = async () => {
+    const { date, time } = getJakartaDateTime();
+    if (time < '19:00:00' || lastRunDate === date || isRunning) return;
+    isRunning = true;
+    try {
+      const updatedCount = await autoCheckoutAttendance(getPool(), date);
+      lastRunDate = date;
+      console.log(`[Attendance] Auto check-out ${date} WIB: ${updatedCount} record diperbarui.`);
+    } catch (error) {
+      console.error('[Attendance] Auto check-out terjadwal gagal:', error);
+    } finally {
+      isRunning = false;
+    }
+  };
+  void runIfDue();
+  const timer = setInterval(() => void runIfDue(), 60_000);
+  timer.unref();
+}
+
+function startBatchCompletionScheduler() {
+  let lastRunDate = '';
+  let isRunning = false;
+  const runIfNeeded = async () => {
+    const { date } = getJakartaDateTime();
+    if (lastRunDate === date || isRunning) return;
+    isRunning = true;
+    try {
+      const result = await completeExpiredBatchEnrollments(getPool(), date);
+      lastRunDate = date;
+      if (result.enrollments || result.batches) {
+        console.log(`[Batch] ${date} WIB: ${result.enrollments} enrollment dan ${result.batches} batch ditandai selesai.`);
+      }
+    } catch (error) {
+      console.error('[Batch] Penandaan batch selesai terjadwal gagal:', error);
+    } finally {
+      isRunning = false;
+    }
+  };
+  void runIfNeeded();
+  const timer = setInterval(() => void runIfNeeded(), 60_000);
+  timer.unref();
+}
+
+function startMissionCompletionScheduler() {
+  let lastRunDate = '';
+  let isRunning = false;
+  const runIfNeeded = async () => {
+    const { date } = getJakartaDateTime();
+    if (lastRunDate === date || isRunning) return;
+    isRunning = true;
+    try {
+      const completedCount = await completeExpiredMissions(getPool(), date);
+      lastRunDate = date;
+      if (completedCount) {
+        console.log(`[Mission] ${date} WIB: ${completedCount} misi ditandai selesai.`);
+      }
+    } catch (error) {
+      console.error('[Mission] Penandaan misi selesai terjadwal gagal:', error);
+    } finally {
+      isRunning = false;
+    }
+  };
+  void runIfNeeded();
+  const timer = setInterval(() => void runIfNeeded(), 60_000);
+  timer.unref();
+}
 
 function isAllowedOrigin(origin: string): boolean {
   if (configuredClientOrigins.includes(origin)) return true;
@@ -348,6 +454,10 @@ app.post('/api/auth/login', async (req, res: Response) => {
       });
     }
 
+    const enrollment = (await loadLatestBatchEnrollments([String(user.id)])).get(String(user.id));
+    const kejuruanId = enrollment?.kejuruan_id || user.kejuruan_id;
+    const kejuruanName = enrollment?.kejuruan_name || user.kejuruan_name;
+
     // Semua role wajib melalui verifikasi password.
     if (password && password.trim()) {
       const isMatch = await comparePassword(password.trim(), user.password_hash);
@@ -370,8 +480,8 @@ app.post('/api/auth/login', async (req, res: Response) => {
       nim: user.nim,
       name: user.name,
       role: user.role,
-      kejuruanId: user.kejuruan_id,
-      kejuruanName: user.kejuruan_name,
+      kejuruanId,
+      kejuruanName,
       loginCode: user.login_code,
     });
     res.cookie(AUTH_COOKIE, token, authCookieOptions);
@@ -383,11 +493,14 @@ app.post('/api/auth/login', async (req, res: Response) => {
       role: user.role,
       avatar: user.avatar,
       phone: user.phone,
-      kejuruanId: user.kejuruan_id,
-      kejuruanName: user.kejuruan_name,
+      kejuruanId,
+      kejuruanName,
       status: user.status,
       joinedDate: user.joined_date,
       loginCode: user.login_code,
+      batchId: enrollment?.batch_id || null,
+      batchName: enrollment?.batch_name || null,
+      enrollmentStatus: enrollment?.enrollment_status || null,
     };
 
     return res.json({
@@ -445,8 +558,8 @@ app.get('/api/auth/me', authenticateToken, async (req: AuthenticatedRequest, res
       role: row.role as Role,
       avatar: row.avatar,
       phone: row.phone,
-      kejuruanId: row.kejuruan_id,
-      kejuruanName: row.kejuruan_name,
+      kejuruanId: enrollment?.kejuruan_id || row.kejuruan_id,
+      kejuruanName: enrollment?.kejuruan_name || row.kejuruan_name,
       status: row.status,
       joinedDate: row.joined_date,
       loginCode: row.login_code,
@@ -492,8 +605,8 @@ app.get(
         role: r.role,
         avatar: r.avatar,
         phone: r.phone,
-        kejuruanId: r.kejuruan_id,
-        kejuruanName: r.kejuruan_name,
+        kejuruanId: batchEnrollments.get(String(r.id))?.kejuruan_id || r.kejuruan_id,
+        kejuruanName: batchEnrollments.get(String(r.id))?.kejuruan_name || r.kejuruan_name,
         status: r.status,
         joinedDate: r.joined_date,
         loginCode: r.login_code,
@@ -581,28 +694,44 @@ app.post(
       const id = `user-${role}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const joinedDate = new Date().toISOString().split('T')[0];
 
-      await pool.query(
-        `INSERT INTO users (
-          id, nim, name, email, role, avatar, phone, kejuruan_id, kejuruan_name,
-          status, joined_date, login_code, password_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          nim.trim(),
-          name.trim(),
-          `${code}@internal.hadirku.id`,
-          role,
-          avatar || null,
-          phone || null,
-          kejuruanId || null,
-          kejuruanName || null,
-          status,
-          joinedDate,
-          code,
-          passwordHash,
-        ]
-      );
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        await connection.query(
+          `INSERT INTO users (
+            id, nim, name, email, role, avatar, phone, kejuruan_id, kejuruan_name,
+            status, joined_date, login_code, password_hash
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            nim.trim(),
+            name.trim(),
+            `${code}@internal.hadirku.id`,
+            role,
+            avatar || null,
+            phone || null,
+            kejuruanId || null,
+            kejuruanName || null,
+            status,
+            joinedDate,
+            code,
+            passwordHash,
+          ]
+        );
+        if (role === 'trainee') {
+          await enrollInCurrentBatch(connection, id, kejuruanId || null, kejuruanName || null, joinedDate);
+        }
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
 
+      const enrollment = role === 'trainee'
+        ? (await loadLatestBatchEnrollments([id])).get(id)
+        : undefined;
       const createdUser = {
         id,
         nim: nim.trim(),
@@ -610,12 +739,15 @@ app.post(
         role,
         avatar: avatar || '',
         phone: phone || '',
-        kejuruanId: kejuruanId || null,
-        kejuruanName: kejuruanName || null,
+        kejuruanId: enrollment?.kejuruan_id || kejuruanId || null,
+        kejuruanName: enrollment?.kejuruan_name || kejuruanName || null,
         status,
         joinedDate,
         loginCode: code,
         password: rawPassword,
+        batchId: enrollment?.batch_id || null,
+        batchName: enrollment?.batch_name || null,
+        enrollmentStatus: enrollment?.enrollment_status || null,
       };
 
       return res.status(201).json({
@@ -724,6 +856,7 @@ app.post(
 
           const salt = await bcrypt.genSalt(10);
           const hash = await bcrypt.hash(rawPassword, salt);
+          const joinedDate = item.joinedDate || new Date().toISOString().split('T')[0];
 
           if (existing.length > 0) {
             await connection.query(
@@ -741,15 +874,17 @@ app.post(
               kejuruanId || null,
               kejuruanName || null,
               item.status || 'active',
-              item.joinedDate || new Date().toISOString().split('T')[0],
+              joinedDate,
               code,
               hash,
               existing[0].id,
             ]
             );
+            if (role === 'trainee') {
+              await enrollInCurrentBatch(connection, String(existing[0].id), kejuruanId || null, kejuruanName || null, joinedDate);
+            }
           } else {
             const id = `user-${role}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-            const joinedDate = item.joinedDate || new Date().toISOString().split('T')[0];
 
             await connection.query(
             `INSERT INTO users (
@@ -772,6 +907,9 @@ app.post(
               hash,
             ]
             );
+            if (role === 'trainee') {
+              await enrollInCurrentBatch(connection, id, kejuruanId || null, kejuruanName || null, joinedDate);
+            }
 
             createdUsers.push({
             id,
@@ -879,6 +1017,31 @@ app.put(
          WHERE id = ?`,
         params
       );
+
+      if (existing[0].role === 'trainee' && (kejuruanId !== undefined || kejuruanName !== undefined)) {
+        const [enrollments] = await pool.query<any[]>(
+          'SELECT id FROM batch_enrollments WHERE user_id = ? ORDER BY start_date DESC, created_at DESC LIMIT 1',
+          [id]
+        );
+        if (enrollments.length > 0) {
+          await pool.query(
+            'UPDATE batch_enrollments SET kejuruan_id = ?, kejuruan_name = ? WHERE id = ?',
+            [
+              kejuruanId !== undefined ? kejuruanId : existing[0].kejuruan_id,
+              kejuruanName !== undefined ? kejuruanName : existing[0].kejuruan_name,
+              enrollments[0].id,
+            ]
+          );
+        } else {
+          await enrollInCurrentBatch(
+            pool,
+            String(id),
+            kejuruanId !== undefined ? kejuruanId : existing[0].kejuruan_id,
+            kejuruanName !== undefined ? kejuruanName : existing[0].kejuruan_name,
+            existing[0].joined_date || new Date().toISOString().split('T')[0]
+          );
+        }
+      }
 
       return res.json({
         success: true,
@@ -1048,6 +1211,10 @@ const mapMission = (row: any) => ({
   submissionGuide: row.submission_guide || undefined,
 });
 
+const missionDateTimeText = (value: any) => value instanceof Date
+  ? value.toISOString()
+  : value ? String(value).replace(' ', 'T') : undefined;
+
 const mentorCanManageProgram = (req: AuthenticatedRequest, kejuruanId: string) => {
   if (req.user?.role !== 'mentor') return req.user?.role === 'admin';
   return String(req.user.kejuruanId || '') === String(kejuruanId);
@@ -1056,11 +1223,15 @@ const mentorCanManageProgram = (req: AuthenticatedRequest, kejuruanId: string) =
 app.get('/api/missions', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const pool = getPool();
-    let query = 'SELECT * FROM missions WHERE status = \'active\' ORDER BY created_at DESC';
+    await completeExpiredMissions(pool, getJakartaDateTime().date);
+    let query = 'SELECT * FROM missions ORDER BY created_at DESC';
     let params: string[] = [];
     if (req.user?.role === 'mentor') {
-      query = `${query.replace(' WHERE status', ' WHERE mentor_id = ? AND status')}`;
+      query = 'SELECT * FROM missions WHERE mentor_id = ? ORDER BY created_at DESC';
       params = [req.user.id];
+    } else if (req.user?.role === 'trainee') {
+      query = 'SELECT * FROM missions WHERE kejuruan_id = ? ORDER BY created_at DESC';
+      params = [req.user.kejuruanId || ''];
     }
     const [rows] = await pool.query<any[]>(query, params);
     res.json({ success: true, missions: rows.map(mapMission) });
@@ -1096,9 +1267,114 @@ app.post('/api/missions', authenticateToken, authorizeRoles('mentor'), async (re
   }
 });
 
+app.post('/api/missions/:id/submissions', authenticateToken, authorizeRoles('trainee'), async (req: AuthenticatedRequest, res) => {
+  const connection = await getPool().getConnection();
+  try {
+    const notes = String(req.body?.notes || '').trim();
+    const submissionLink = String(req.body?.submissionLink || '').trim();
+    if (!notes) {
+      return res.status(400).json({ success: false, message: 'Catatan hasil pengerjaan wajib diisi.' });
+    }
+
+    await connection.beginTransaction();
+    const [missionRows] = await connection.query<any[]>(
+      'SELECT * FROM missions WHERE id = ? LIMIT 1 FOR UPDATE',
+      [req.params.id]
+    );
+    const mission = missionRows[0];
+    if (!mission) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Misi tidak ditemukan.' });
+    }
+    const { date, time } = getJakartaDateTime();
+    if (mission.status !== 'active' || String(mission.due_date).slice(0, 10) < date) {
+      await connection.query('UPDATE missions SET status = "archived" WHERE id = ?', [mission.id]);
+      await connection.commit();
+      return res.status(409).json({ success: false, message: 'Batas waktu misi sudah terlewat atau misi telah ditutup.' });
+    }
+    if (String(mission.kejuruan_id) !== String(req.user?.kejuruanId || '')) {
+      await connection.rollback();
+      return res.status(403).json({ success: false, message: 'Misi ini tidak ditujukan untuk kejuruan Anda.' });
+    }
+
+    // Periksa apakah misi sudah dikerjakan oleh peserta magang mana pun
+    const [anyExistingRows] = await connection.query<any[]>(
+      `SELECT * FROM mission_submissions
+       WHERE mission_id = ?
+       LIMIT 1 FOR UPDATE`,
+      [mission.id]
+    );
+    if (anyExistingRows.length > 0) {
+      await connection.query('UPDATE missions SET status = "archived" WHERE id = ?', [mission.id]);
+      await connection.commit();
+      return res.status(409).json({ success: false, message: 'Misi ini sudah dikerjakan oleh peserta magang lain dan telah ditutup.' });
+    }
+
+    const submissionId = `sub-${randomUUID()}`;
+    const submittedAt = `${date} ${time}`;
+    const awardedPoints = Number(mission.points) || 0;
+
+    // Masukkan pengumpulan dengan status 'approved' dan poin langsung otomatis diberikan
+    await connection.query(
+      `INSERT INTO mission_submissions
+       (id, mission_id, mission_title, trainee_id, trainee_name, trainee_nim, trainee_avatar,
+        kejuruan_id, kejuruan_name, submission_link, notes, points, submitted_at, status, reviewed_by, reviewed_at, feedback)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', 'Sistem', NOW(), 'Poin otomatis diberikan setelah misi dikerjakan.')`,
+      [submissionId, mission.id, mission.title, req.user?.id, req.user?.name, req.user?.nim,
+        req.user?.avatar || null, mission.kejuruan_id, mission.kejuruan_name,
+        submissionLink || null, notes, awardedPoints, submittedAt]
+    );
+
+    // Misi otomatis ditutup (archived) agar peserta lain tidak dapat mengerjakan
+    await connection.query(
+      `UPDATE missions SET status = 'archived' WHERE id = ?`,
+      [mission.id]
+    );
+
+    const [savedRows] = await connection.query<any[]>(
+      'SELECT * FROM mission_submissions WHERE id = ? LIMIT 1',
+      [submissionId]
+    );
+    const saved = savedRows[0];
+    if (!saved) throw new Error('Pengumpulan tersimpan tetapi gagal dibaca ulang.');
+    await connection.commit();
+    return res.status(201).json({
+      success: true,
+      message: `Tugas misi berhasil dikirim! Selamat, ${awardedPoints} poin otomatis diberikan ke akun Anda.`,
+      submission: {
+        id: saved.id,
+        missionId: saved.mission_id,
+        missionTitle: saved.mission_title,
+        traineeId: saved.trainee_id,
+        traineeName: saved.trainee_name,
+        traineeNim: saved.trainee_nim,
+        traineeAvatar: saved.trainee_avatar || '',
+        kejuruanId: saved.kejuruan_id || '',
+        kejuruanName: saved.kejuruan_name || '',
+        submissionLink: saved.submission_link || undefined,
+        notes: saved.notes || '',
+        points: Number(saved.points),
+        submittedAt: missionDateTimeText(saved.submitted_at),
+        status: saved.status,
+        reviewedBy: saved.reviewed_by || 'Sistem',
+        reviewedAt: missionDateTimeText(saved.reviewed_at),
+        feedback: saved.feedback || 'Poin otomatis diberikan.',
+      },
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('[Mission Submission Error]', error);
+    return res.status(500).json({ success: false, message: 'Pengumpulan misi gagal disimpan ke TiDB.' });
+  } finally {
+    connection.release();
+  }
+});
+
 app.put('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), async (req: AuthenticatedRequest, res) => {
   try {
     const pool = getPool();
+    const today = getJakartaDateTime().date;
+    await completeExpiredMissions(pool, today);
     const [rows] = await pool.query<any[]>('SELECT * FROM missions WHERE id = ? LIMIT 1', [req.params.id]);
     const existing = rows[0];
     if (!existing) return res.status(404).json({ success: false, message: 'Misi tidak ditemukan.' });
@@ -1111,12 +1387,16 @@ app.put('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), async 
     if (!mentorCanManageProgram(req, targetKejuruanId)) {
       return res.status(403).json({ success: false, message: 'Mentor hanya dapat membuat misi untuk kejuruan yang ditugaskan.' });
     }
+    const targetDueDate = updates.dueDate ?? existing.due_date;
+    const targetStatus = existing.status === 'active' && String(targetDueDate).slice(0, 10) < today
+      ? 'archived'
+      : existing.status;
     await pool.query(
       `UPDATE missions SET title = ?, description = ?, kejuruan_id = ?, kejuruan_name = ?, points = ?, difficulty = ?, due_date = ?, status = ?, category = ?, submission_guide = ? WHERE id = ?`,
       [updates.title ?? existing.title, updates.description ?? existing.description, targetKejuruanId,
-        updates.kejuruanName ?? existing.kejuruan_name, Number(updates.points ?? existing.points),
+        updates.kejuruanName ?? existing.kejuruan_name, Number(existing.points),
         updates.difficulty ?? existing.difficulty, updates.dueDate ?? existing.due_date,
-        updates.status ?? existing.status, updates.category ?? existing.category,
+        targetStatus, updates.category ?? existing.category,
         updates.submissionGuide ?? existing.submission_guide, req.params.id]
     );
     res.json({ success: true, message: 'Misi berhasil diperbarui.' });
@@ -1146,64 +1426,74 @@ app.delete('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), asy
 
 app.patch('/api/missions/submissions/:id/review', authenticateToken, authorizeRoles('mentor', 'admin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, feedback, points } = req.body || {};
-    const awardedPoints = Number(points);
-    if (!['approved', 'rejected'].includes(status) || !Number.isInteger(awardedPoints) || awardedPoints < 0 || awardedPoints > 500) {
-      return res.status(400).json({ success: false, message: 'Status atau poin review tidak valid.' });
+    const { status, feedback } = req.body || {};
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status review tidak valid.' });
     }
 
-    const pool = getPool();
-    const [rows] = await pool.query<any[]>(
-      `SELECT s.id, m.kejuruan_id
-       FROM mission_submissions s
-       JOIN missions m ON m.id = s.mission_id
-       WHERE s.id = ? LIMIT 1`,
-      [req.params.id]
-    );
-    const submission = rows[0];
-    if (!submission) return res.status(404).json({ success: false, message: 'Pengumpulan tugas tidak ditemukan.' });
-    if (req.user?.role === 'mentor' && String(submission.kejuruan_id || '') !== String(req.user.kejuruanId || '')) {
-      return res.status(403).json({ success: false, message: 'Review hanya dapat dilakukan untuk tugas pada kejuruan Anda.' });
-    }
+    const connection = await getPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      const [rows] = await connection.query<any[]>(
+        `SELECT s.id, m.kejuruan_id, m.points
+         FROM mission_submissions s
+         JOIN missions m ON m.id = s.mission_id
+         WHERE s.id = ? LIMIT 1 FOR UPDATE`,
+        [req.params.id]
+      );
+      const submission = rows[0];
+      if (!submission) {
+        await connection.rollback();
+        return res.status(404).json({ success: false, message: 'Pengumpulan tugas tidak ditemukan.' });
+      }
+      if (req.user?.role === 'mentor' && String(submission.kejuruan_id || '') !== String(req.user.kejuruanId || '')) {
+        await connection.rollback();
+        return res.status(403).json({ success: false, message: 'Review hanya dapat dilakukan untuk tugas pada kejuruan Anda.' });
+      }
+      const awardedPoints = status === 'approved' ? Number(submission.points) : 0;
 
-    await pool.query(
-      `UPDATE mission_submissions
-       SET status = ?, points = ?, reviewed_by = ?, reviewed_at = NOW(), feedback = ?
-       WHERE id = ?`,
-      [status, awardedPoints, String(req.user?.name || 'Mentor').slice(0, 64), String(feedback || '').trim(), req.params.id]
-    );
-    const [savedRows] = await pool.query<any[]>(
-      'SELECT * FROM mission_submissions WHERE id = ? LIMIT 1',
-      [req.params.id]
-    );
-    const saved = savedRows[0];
-    if (!saved) return res.status(500).json({ success: false, message: 'Review tersimpan tetapi hasilnya gagal dibaca ulang.' });
-    const formatDateTime = (value: any) => value instanceof Date
-      ? value.toISOString()
-      : value ? String(value).replace(' ', 'T') : undefined;
-    return res.json({
-      success: true,
-      message: 'Review tugas berhasil disimpan ke TiDB.',
-      submission: {
-        id: saved.id,
-        missionId: saved.mission_id,
-        missionTitle: saved.mission_title,
-        traineeId: saved.trainee_id,
-        traineeName: saved.trainee_name,
-        traineeNim: saved.trainee_nim,
-        traineeAvatar: saved.trainee_avatar || '',
-        kejuruanId: saved.kejuruan_id || '',
-        kejuruanName: saved.kejuruan_name || '',
-        submissionLink: saved.submission_link || undefined,
-        notes: saved.notes || '',
-        points: Number(saved.points),
-        submittedAt: formatDateTime(saved.submitted_at),
-        status: saved.status,
-        reviewedBy: saved.reviewed_by || undefined,
-        reviewedAt: formatDateTime(saved.reviewed_at),
-        feedback: saved.feedback || undefined,
-      },
-    });
+      await connection.query(
+        `UPDATE mission_submissions
+         SET status = ?, points = ?, reviewed_by = ?, reviewed_at = NOW(), feedback = ?
+         WHERE id = ?`,
+        [status, awardedPoints, String(req.user?.name || 'Mentor').slice(0, 64), String(feedback || '').trim(), req.params.id]
+      );
+      const [savedRows] = await connection.query<any[]>(
+        'SELECT * FROM mission_submissions WHERE id = ? LIMIT 1',
+        [req.params.id]
+      );
+      const saved = savedRows[0];
+      if (!saved) throw new Error('Review tersimpan tetapi hasilnya gagal dibaca ulang.');
+      await connection.commit();
+      return res.json({
+        success: true,
+        message: 'Review tugas berhasil disimpan ke TiDB.',
+        submission: {
+          id: saved.id,
+          missionId: saved.mission_id,
+          missionTitle: saved.mission_title,
+          traineeId: saved.trainee_id,
+          traineeName: saved.trainee_name,
+          traineeNim: saved.trainee_nim,
+          traineeAvatar: saved.trainee_avatar || '',
+          kejuruanId: saved.kejuruan_id || '',
+          kejuruanName: saved.kejuruan_name || '',
+          submissionLink: saved.submission_link || undefined,
+          notes: saved.notes || '',
+          points: Number(saved.points),
+          submittedAt: missionDateTimeText(saved.submitted_at),
+          status: saved.status,
+          reviewedBy: saved.reviewed_by || undefined,
+          reviewedAt: missionDateTimeText(saved.reviewed_at),
+          feedback: saved.feedback || undefined,
+        },
+      });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   } catch (error: any) {
     console.error('[Mission Review Error]', error);
     return res.status(500).json({ success: false, message: 'Review tugas gagal disimpan ke TiDB.' });
@@ -1344,6 +1634,9 @@ async function startServer() {
     } else {
       await initDatabase();
       console.log(`[Server] TiDB connected and 3 Roles seeded: Admin, Mentor, Trainee`);
+      startAttendanceAutoCheckoutScheduler();
+      startBatchCompletionScheduler();
+      startMissionCompletionScheduler();
     }
   } catch (err) {
     console.error('[Server Warning] Gagal menghubungkan ke TiDB saat startup:', err);
