@@ -217,6 +217,34 @@ export async function initDatabase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `,
     `
+    CREATE TABLE IF NOT EXISTS batches (
+      id VARCHAR(64) PRIMARY KEY,
+      code VARCHAR(64) NOT NULL UNIQUE,
+      name VARCHAR(128) NOT NULL,
+      start_date DATE,
+      end_date DATE,
+      status ENUM('planned','active','completed') NOT NULL DEFAULT 'planned',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_batches_status_dates (status, start_date, end_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS batch_enrollments (
+      id VARCHAR(64) PRIMARY KEY,
+      user_id VARCHAR(64) NOT NULL,
+      batch_id VARCHAR(64) NOT NULL,
+      status ENUM('active','graduated','withdrawn') NOT NULL DEFAULT 'active',
+      start_date DATE NOT NULL,
+      end_date DATE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_batch_enrollment_user_batch (user_id, batch_id),
+      INDEX idx_batch_enrollments_user_dates (user_id, start_date, created_at),
+      INDEX idx_batch_enrollments_batch_status (batch_id, status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    `
     CREATE TABLE IF NOT EXISTS kejuruan (
       id VARCHAR(64) PRIMARY KEY,
       name VARCHAR(255) NOT NULL,

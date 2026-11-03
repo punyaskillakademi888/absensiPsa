@@ -27,6 +27,9 @@ export interface User {
   kejuruanName?: string;
   status: 'active' | 'inactive';
   joinedDate: string;
+  batchId?: string | null;
+  batchName?: string | null;
+  enrollmentStatus?: 'active' | 'graduated' | 'withdrawn' | null;
   loginCode?: string; // 8-digit random code (e.g. 84920194)
   password?: string;  // Login password
 }

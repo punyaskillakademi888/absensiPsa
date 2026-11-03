@@ -14,6 +14,19 @@ interface ExportParams {
   records: AttendanceRecord[];
 }
 
+const enrollmentStatusLabel = (status: User['enrollmentStatus']): string => {
+  switch (status) {
+    case 'active':
+      return 'Aktif';
+    case 'graduated':
+      return 'Lulus';
+    case 'withdrawn':
+      return 'Mengundurkan diri';
+    default:
+      return 'Belum ditetapkan';
+  }
+};
+
 export interface TraineeRecapSummary {
   trainee: User;
   dailyStatus: Record<number, string>; // day 1..31 -> 'H' | 'T' | 'I' | 'S' | 'A' | '-'
@@ -170,6 +183,8 @@ export function exportToExcel(params: ExportParams): void {
     'NIM',
     'Nama Peserta',
     'Kejuruan',
+    'Batch',
+    'Status Kepesertaan',
     // Days 1..N
     ...Array.from({ length: daysInMonth }, (_, i) => `Tgl ${i + 1}`),
     'Hadir (H)',
@@ -191,6 +206,8 @@ export function exportToExcel(params: ExportParams): void {
       s.trainee.nim,
       s.trainee.name,
       s.trainee.kejuruanName || '-',
+      s.trainee.batchName || 'Belum ditetapkan',
+      enrollmentStatusLabel(s.trainee.enrollmentStatus),
       ...dailyCols,
       s.hadir,
       s.terlambat,
@@ -227,6 +244,8 @@ export function exportToExcel(params: ExportParams): void {
     { wch: 15 }, // NIM
     { wch: 25 }, // Nama
     { wch: 24 }, // Kejuruan
+    { wch: 18 }, // Batch
+    { wch: 22 }, // Status kepesertaan
     ...Array.from({ length: daysInMonth }, () => ({ wch: 5 })),
     { wch: 10 }, // H
     { wch: 12 }, // T
@@ -301,7 +320,7 @@ export function exportToPDF(params: ExportParams): void {
 
   // Table Data
   const tableHead = [
-    ['No', 'NIM', 'Nama Peserta', 'Kejuruan', 'Hadir (H)', 'Telat (T)', 'Izin (I)', 'Sakit (S)', 'Alpha (A)', 'Tingkat Kehadiran', 'Predikat']
+    ['No', 'NIM', 'Nama Peserta', 'Kejuruan', 'Batch', 'Status Kepesertaan', 'Hadir (H)', 'Telat (T)', 'Izin (I)', 'Sakit (S)', 'Alpha (A)', 'Tingkat Kehadiran', 'Predikat']
   ];
 
   const tableBody = summaries.map((s, idx) => {
@@ -315,6 +334,8 @@ export function exportToPDF(params: ExportParams): void {
       s.trainee.nim,
       s.trainee.name,
       s.trainee.kejuruanName || '-',
+      s.trainee.batchName || 'Belum ditetapkan',
+      enrollmentStatusLabel(s.trainee.enrollmentStatus),
       s.hadir,
       s.terlambat,
       s.izin,
@@ -342,17 +363,19 @@ export function exportToPDF(params: ExportParams): void {
       cellPadding: 2
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 10 },
-      1: { halign: 'center', cellWidth: 26 },
-      2: { halign: 'left', cellWidth: 50 },
-      3: { halign: 'left', cellWidth: 50 },
-      4: { halign: 'center', cellWidth: 18 },
-      5: { halign: 'center', cellWidth: 18 },
-      6: { halign: 'center', cellWidth: 16 },
-      7: { halign: 'center', cellWidth: 16 },
-      8: { halign: 'center', cellWidth: 18 },
-      9: { halign: 'center', cellWidth: 26 },
-      10: { halign: 'center', cellWidth: 26 }
+      0: { halign: 'center', cellWidth: 8 },
+      1: { halign: 'center', cellWidth: 20 },
+      2: { halign: 'left', cellWidth: 36 },
+      3: { halign: 'left', cellWidth: 34 },
+      4: { halign: 'left', cellWidth: 19 },
+      5: { halign: 'center', cellWidth: 24 },
+      6: { halign: 'center', cellWidth: 12 },
+      7: { halign: 'center', cellWidth: 12 },
+      8: { halign: 'center', cellWidth: 12 },
+      9: { halign: 'center', cellWidth: 12 },
+      10: { halign: 'center', cellWidth: 12 },
+      11: { halign: 'center', cellWidth: 22 },
+      12: { halign: 'center', cellWidth: 22 }
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252]

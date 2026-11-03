@@ -38,6 +38,34 @@ function importedKejuruanId(programName: string): string {
   return `kj-import-${(hash >>> 0).toString(36)}`;
 }
 
+interface BatchEnrollmentRow {
+  user_id: string;
+  batch_id: string;
+  enrollment_status: 'active' | 'graduated' | 'withdrawn';
+  batch_name: string | null;
+}
+
+async function loadLatestBatchEnrollments(userIds: string[]) {
+  const uniqueUserIds = [...new Set(userIds)];
+  if (!uniqueUserIds.length) return new Map<string, BatchEnrollmentRow>();
+
+  const placeholders = uniqueUserIds.map(() => '?').join(', ');
+  const [rows] = await getPool().query<any[]>(
+    `SELECT be.user_id, be.batch_id, be.status AS enrollment_status, b.name AS batch_name
+     FROM batch_enrollments be
+     LEFT JOIN batches b ON b.id = be.batch_id
+     WHERE be.user_id IN (${placeholders})
+     ORDER BY be.user_id, be.start_date DESC, be.created_at DESC, be.id DESC`,
+    uniqueUserIds
+  );
+  const latestByUser = new Map<string, BatchEnrollmentRow>();
+  for (const row of rows) {
+    const userId = String(row.user_id);
+    if (!latestByUser.has(userId)) latestByUser.set(userId, row as BatchEnrollmentRow);
+  }
+  return latestByUser;
+}
+
 const configuredClientOrigins = (process.env.CLIENT_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
@@ -409,6 +437,7 @@ app.get('/api/auth/me', authenticateToken, async (req: AuthenticatedRequest, res
     }
 
     const row = rows[0];
+    const enrollment = (await loadLatestBatchEnrollments([String(row.id)])).get(String(row.id));
     const user = {
       id: row.id,
       nim: row.nim,
@@ -421,6 +450,9 @@ app.get('/api/auth/me', authenticateToken, async (req: AuthenticatedRequest, res
       status: row.status,
       joinedDate: row.joined_date,
       loginCode: row.login_code,
+      batchId: enrollment?.batch_id || null,
+      batchName: enrollment?.batch_name || null,
+      enrollmentStatus: enrollment?.enrollment_status || null,
     };
 
     return res.json({
@@ -451,6 +483,7 @@ app.get(
         FROM users ORDER BY role ASC, name ASC
       `;
       const [rows] = await pool.query<any[]>(query);
+      const batchEnrollments = await loadLatestBatchEnrollments(rows.map(row => String(row.id)));
 
       const mappedUsers = rows.map(r => ({
         id: r.id,
@@ -464,6 +497,9 @@ app.get(
         status: r.status,
         joinedDate: r.joined_date,
         loginCode: r.login_code,
+        batchId: batchEnrollments.get(String(r.id))?.batch_id || null,
+        batchName: batchEnrollments.get(String(r.id))?.batch_name || null,
+        enrollmentStatus: batchEnrollments.get(String(r.id))?.enrollment_status || null,
       }));
 
       return res.json({
