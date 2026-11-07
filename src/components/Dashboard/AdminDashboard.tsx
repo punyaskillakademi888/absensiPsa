@@ -13,11 +13,12 @@ import {
   ChevronRight,
   FileText
 } from 'lucide-react';
-import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB } from '../../utils/dateUtils';
+import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB, isWeekend } from '../../utils/dateUtils';
 import { AttendanceStatus } from '../../types';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
 import { DEFAULT_PAGE_SIZE, Pagination } from '../Pagination';
+import { PageHeader } from '../PageHeader';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ export const AdminDashboard: React.FC = () => {
   } = useApp();
 
   const today = getTodayDateString();
+  const isHoliday = isWeekend(today);
   const [currentYear, currentMonth] = today.split('-').map(Number);
   const [selectedKejuruanFilter, setSelectedKejuruanFilter] = useState<string>('all');
   const [activeAdminView, setActiveAdminView] = useState<'mentors' | 'trainees'>('mentors');
@@ -97,6 +99,10 @@ export const AdminDashboard: React.FC = () => {
 
   // Mentor stats
   const mentorStats = useMemo(() => {
+    if (isHoliday) {
+      return { total: mentors.length, hadir: 0, pendingVerification: 0, verified: 0, belumAbsen: 0 };
+    }
+
     let hadir = 0;
     let pendingVerification = 0;
     let verified = 0;
@@ -122,7 +128,7 @@ export const AdminDashboard: React.FC = () => {
       verified,
       belumAbsen
     };
-  }, [mentorTodayRecords, mentors.length]);
+  }, [mentorTodayRecords, mentors.length, isHoliday]);
 
   // Trainee attendance records today
   const traineeTodayRecords = useMemo(() => {
@@ -131,6 +137,19 @@ export const AdminDashboard: React.FC = () => {
 
   const traineeMetrics = useMemo(() => {
     const totalTrainees = trainees.length;
+    if (isHoliday) {
+      return {
+        totalTrainees,
+        hadirTepat: 0,
+        terlambat: 0,
+        izin: 0,
+        sakit: 0,
+        belumAbsen: 0,
+        totalHadir: 0,
+        attendanceRate: 0
+      };
+    }
+
     let hadirTepat = 0;
     let terlambat = 0;
     let izin = 0;
@@ -158,7 +177,7 @@ export const AdminDashboard: React.FC = () => {
       totalHadir,
       attendanceRate
     };
-  }, [trainees.length, traineeTodayRecords]);
+  }, [trainees.length, traineeTodayRecords, isHoliday]);
 
   // Kejuruan statistics for trainees
   const kejuruanStats = useMemo(() => {
@@ -286,6 +305,14 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
+      <PageHeader
+        eyebrow="DASHBOARD ADMIN"
+        title={`Selamat datang, ${currentUser.name}`}
+        description={isHoliday
+          ? `Hari libur akhir pekan · ${formatIndonesianDate(today)}. Mentor dan peserta tidak perlu melakukan presensi.`
+          : `Presensi magang harian · ${formatIndonesianDate(today)}`}
+      />
+
       {/* Segmented View Switcher: Verifikasi Mentor vs Rekap Peserta */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4EAF0] pb-3">
         <div className="flex flex-wrap items-center gap-1 bg-[#F4F6F8] p-1 rounded-xl border border-[#E4EAF0]">
@@ -354,9 +381,9 @@ export const AdminDashboard: React.FC = () => {
               </span>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-3xl font-bold tabular-nums text-[#28618F]">
-                  {mentorStats.hadir}
+                  {isHoliday ? 'Libur' : mentorStats.hadir}
                 </span>
-                <span className="text-xs text-[#6F7F8D]">tercatat</span>
+                {!isHoliday && <span className="text-xs text-[#6F7F8D]">tercatat</span>}
               </div>
             </article>
 
@@ -445,7 +472,7 @@ export const AdminDashboard: React.FC = () => {
 
                         <td className="py-3.5 px-3 font-mono text-[#123B59] tabular-nums">
                           {record?.checkInTime ? `${record.checkInTime} WIB` : (
-                            <span className="text-[#6F7F8D] italic">Belum hadir</span>
+                            <span className="text-[#6F7F8D] italic">{isHoliday ? 'Hari Libur' : 'Belum hadir'}</span>
                           )}
                         </td>
 
@@ -466,14 +493,14 @@ export const AdminDashboard: React.FC = () => {
                             </span>
                           ) : (
                             <span className="inline-flex whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-bold bg-[#F4F6F8] text-[#6F7F8D]">
-                              Belum Absen
+                              {isHoliday ? 'Hari Libur' : 'Belum Absen'}
                             </span>
                           )}
                         </td>
 
                         <td className="py-3.5 px-3">
                           {notCheckedIn ? (
-                            <span className="text-[#6F7F8D] text-[11px]">Menunggu Check-In</span>
+                            <span className="text-[#6F7F8D] text-[11px]">{isHoliday ? 'Tidak diperlukan' : 'Menunggu Check-In'}</span>
                           ) : isPending ? (
                             <span className="inline-flex items-center gap-1 font-bold text-[10px] bg-[#FFF5E6] text-[#C05621] px-2.5 py-1 rounded-full border border-amber-200">
                               <AlertTriangle className="w-3 h-3 shrink-0" />
@@ -510,6 +537,7 @@ export const AdminDashboard: React.FC = () => {
                               </button>
                             )}
 
+                            {!isHoliday && <>
                             {/* Quick Select Status Badges */}
                             <button
                               type="button"
@@ -571,6 +599,7 @@ export const AdminDashboard: React.FC = () => {
                             >
                               A
                             </button>
+                            </>}
                           </div>
                         </td>
                       </tr>
@@ -616,11 +645,11 @@ export const AdminDashboard: React.FC = () => {
               </span>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-3xl font-bold tabular-nums text-[#4C83B5]">
-                  {traineeMetrics.attendanceRate}%
+                  {isHoliday ? 'Libur' : `${traineeMetrics.attendanceRate}%`}
                 </span>
-                <span className="text-xs text-[#6F7F8D]">
+                {!isHoliday && <span className="text-xs text-[#6F7F8D]">
                   ({traineeMetrics.totalHadir}/{traineeMetrics.totalTrainees})
-                </span>
+                </span>}
               </div>
             </article>
 
@@ -666,7 +695,7 @@ export const AdminDashboard: React.FC = () => {
                     {stat.kejuruan.code}
                   </span>
                   <span className="font-bold text-[#4C83B5]">
-                    {stat.rate}%
+                    {isHoliday ? 'Libur' : `${stat.rate}%`}
                   </span>
                 </div>
                 <div className="text-[11px] text-[#6F7F8D] truncate mt-1">

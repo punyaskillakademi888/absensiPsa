@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import { Clock, MapPin, Save, CheckCircle2, ShieldCheck, UserCheck, GraduationCap, LocateFixed } from 'lucide-react';
 import { DEFAULT_LATE_POINT_PENALTY_PER_MINUTE } from '../../utils/latePenalty';
 
@@ -74,19 +74,11 @@ export const SettingsView: React.FC = () => {
 
   return (
     <div className="w-full min-w-0 space-y-6">
-      {/* Header */}
-      <div className="pb-4 border-b border-[#E4EAF0]">
-        <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase">
-          KONFIGURASI LEMBAGA
-        </p>
-        <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight text-[#123B59]">
-          Pengaturan Presensi & Lokasi GPS
-        </h1>
-        <p className="text-xs text-[#6F7F8D] mt-1">
-          Konfigurasi jam masuk pelatihan kejuruan, batas toleransi keterlambatan, tarif pengurangan poin per menit telat, dan parameter radius absensi.
-        </p>
-        <MobileHeaderStatus />
-      </div>
+      <PageHeader
+        eyebrow="KONFIGURASI LEMBAGA"
+        title="Pengaturan Presensi & Lokasi GPS"
+        description="Presensi berlaku pada hari kerja Senin sampai Jumat. Sabtu dan Minggu merupakan hari libur. Atur jam masuk, batas keterlambatan, penalti, dan radius lokasi absensi."
+      />
 
       {savedSuccess && (
         <div className="p-3.5 bg-[#EEF6FB] border border-[#C8DCEB] text-[#123B59] rounded-2xl text-xs font-bold flex items-center gap-2">

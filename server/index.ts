@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { getPool, initDatabase, pingDatabase, describeDatabaseConfig, DbUser } from './db.js';
 import { appDataRouter } from './appData.js';
+import { rewardsRouter } from './rewards.js';
 import {
   autoCheckoutAttendance,
   completeExpiredBatchEnrollments,
@@ -225,11 +226,15 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/app-data', appDataRouter);
+app.use('/api/rewards', rewardsRouter);
 
 app.post('/api/upload/signature', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
   const folder = String(req.body?.folder || '');
-  if (!['hadirku/profile', 'hadirku/reports'].includes(folder)) {
+  if (!['hadirku/profile', 'hadirku/reports', 'hadirku/rewards'].includes(folder)) {
     return res.status(400).json({ success: false, message: 'Folder upload tidak valid.' });
+  }
+  if (folder === 'hadirku/rewards' && req.user?.role !== 'admin' && req.user?.role !== 'mentor') {
+    return res.status(403).json({ success: false, message: 'Hanya mentor/admin yang dapat mengunggah gambar hadiah.' });
   }
 
   try {
@@ -1324,6 +1329,14 @@ app.post('/api/missions/:id/submissions', authenticateToken, authorizeRoles('tra
         req.user?.avatar || null, mission.kejuruan_id, mission.kejuruan_name,
         submissionLink || null, notes, awardedPoints, submittedAt]
     );
+    if (awardedPoints > 0) {
+      await connection.query(
+        `INSERT IGNORE INTO point_ledger (id, trainee_id, entry_type, reference_id, points_delta)
+         SELECT CONCAT('seed-ms-', LEFT(SHA2(CONCAT(?, ':', ?), 256), 32)),
+                ?, 'mission_award', ?, ?`,
+        [req.user!.id, submissionId, req.user!.id, submissionId, awardedPoints]
+      );
+    }
 
     // Misi otomatis ditutup (archived) agar peserta lain tidak dapat mengerjakan
     await connection.query(
@@ -1435,7 +1448,7 @@ app.patch('/api/missions/submissions/:id/review', authenticateToken, authorizeRo
     try {
       await connection.beginTransaction();
       const [rows] = await connection.query<any[]>(
-        `SELECT s.id, m.kejuruan_id, m.points
+        `SELECT s.id, s.trainee_id, s.status, s.points, m.kejuruan_id, m.points AS mission_points
          FROM mission_submissions s
          JOIN missions m ON m.id = s.mission_id
          WHERE s.id = ? LIMIT 1 FOR UPDATE`,
@@ -1450,7 +1463,17 @@ app.patch('/api/missions/submissions/:id/review', authenticateToken, authorizeRo
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Review hanya dapat dilakukan untuk tugas pada kejuruan Anda.' });
       }
-      const awardedPoints = status === 'approved' ? Number(submission.points) : 0;
+      await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [submission.trainee_id]);
+      const awardedPoints = status === 'approved' ? Number(submission.mission_points) : 0;
+      let pointDelta = 0;
+      if (status !== submission.status) {
+        const [ledgerRows] = await connection.query<any[]>(
+          'SELECT COALESCE(SUM(points_delta), 0) AS points FROM point_ledger WHERE reference_id = ?',
+          [submission.id]
+        );
+        const previouslyCredited = Number(ledgerRows[0]?.points || 0);
+        pointDelta = status === 'approved' ? awardedPoints - previouslyCredited : -previouslyCredited;
+      }
 
       await connection.query(
         `UPDATE mission_submissions
@@ -1458,6 +1481,19 @@ app.patch('/api/missions/submissions/:id/review', authenticateToken, authorizeRo
          WHERE id = ?`,
         [status, awardedPoints, String(req.user?.name || 'Mentor').slice(0, 64), String(feedback || '').trim(), req.params.id]
       );
+      if (pointDelta !== 0) {
+        await connection.query(
+          `INSERT INTO point_ledger (id, trainee_id, entry_type, reference_id, points_delta)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            randomUUID(),
+            String(submission.trainee_id),
+            pointDelta > 0 ? 'mission_award' : 'mission_reversal',
+            String(submission.id),
+            pointDelta,
+          ]
+        );
+      }
       const [savedRows] = await connection.query<any[]>(
         'SELECT * FROM mission_submissions WHERE id = ? LIMIT 1',
         [req.params.id]

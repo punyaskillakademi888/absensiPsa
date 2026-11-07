@@ -411,11 +411,89 @@ export async function initDatabase() {
       INDEX idx_daily_reports_kejuruan (kejuruan_id, status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `,
+    `
+    CREATE TABLE IF NOT EXISTS mentor_daily_reports (
+      id VARCHAR(64) PRIMARY KEY,
+      mentor_id VARCHAR(64) NOT NULL,
+      mentor_name VARCHAR(128) NOT NULL,
+      mentor_nim VARCHAR(64) NOT NULL,
+      kejuruan_id VARCHAR(64),
+      kejuruan_name VARCHAR(255),
+      report_date DATE NOT NULL,
+      activities TEXT NOT NULL,
+      achievements TEXT,
+      obstacles TEXT,
+      next_plan TEXT,
+      submitted_at DATETIME NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_mentor_daily_report_date (mentor_id, report_date),
+      INDEX idx_mentor_daily_reports_date (report_date, submitted_at),
+      INDEX idx_mentor_daily_reports_mentor (mentor_id, report_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS reward_items (
+      id VARCHAR(64) PRIMARY KEY,
+      title VARCHAR(150) NOT NULL,
+      description TEXT,
+      points_cost INT NOT NULL,
+      stock INT NOT NULL DEFAULT 0,
+      image_url TEXT,
+      image_public_id VARCHAR(255),
+      category VARCHAR(64) NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_reward_items_active_created (is_active, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS reward_redemptions (
+      id VARCHAR(64) PRIMARY KEY,
+      reward_id VARCHAR(64) NOT NULL,
+      reward_title VARCHAR(150) NOT NULL,
+      trainee_id VARCHAR(64) NOT NULL,
+      trainee_name VARCHAR(128) NOT NULL,
+      points_spent INT NOT NULL,
+      status ENUM('pending','ready','completed','cancelled') NOT NULL DEFAULT 'pending',
+      pickup_code VARCHAR(16) NOT NULL,
+      redeemed_at DATETIME NOT NULL,
+      completed_at DATETIME NULL,
+      updated_by VARCHAR(64) NULL,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_reward_redemptions_trainee_date (trainee_id, redeemed_at),
+      INDEX idx_reward_redemptions_status_date (status, redeemed_at),
+      INDEX idx_reward_redemptions_reward (reward_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS point_ledger (
+      id VARCHAR(64) PRIMARY KEY,
+      trainee_id VARCHAR(64) NOT NULL,
+      entry_type ENUM('mission_award','mission_reversal') NOT NULL,
+      reference_id VARCHAR(64) NOT NULL,
+      points_delta INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_point_ledger_trainee_created (trainee_id, created_at),
+      INDEX idx_point_ledger_reference (reference_id, entry_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
   ];
 
   for (const migration of tableMigrations) {
     await p.query(migration);
   }
+
+  await p.query(
+    `INSERT IGNORE INTO point_ledger (id, trainee_id, entry_type, reference_id, points_delta)
+     SELECT CONCAT('seed-ms-', LEFT(SHA2(CONCAT(trainee_id, ':', id), 256), 32)),
+            trainee_id, 'mission_award', id, points
+     FROM mission_submissions
+     WHERE status = 'approved' AND points > 0`
+  );
 
   const [batchEnrollmentProgramColumns] = await p.query<any[]>(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
@@ -572,6 +650,72 @@ export async function initDatabase() {
   }
 
   await p.query(`DELETE FROM kejuruan WHERE UPPER(code) IN ('CS-05','DA-03','DM-04','UX-02','WD-01')`);
+
+  // Seed default reward items jika katalog masih kosong
+  const [rewardCount] = await p.query<any[]>('SELECT COUNT(*) AS total FROM reward_items');
+  if (Number(rewardCount[0]?.total || 0) === 0) {
+    const { randomUUID } = await import('node:crypto');
+    const seedItems = [
+      {
+        id: randomUUID(),
+        title: 'Gantungan Kunci PSA',
+        description: 'Gantungan kunci eksklusif berlogo PSA, cocok sebagai koleksi kenangan OJT.',
+        points_cost: 50,
+        stock: 20,
+        category: 'Merchandise',
+        image_url: '',
+        image_public_id: '',
+      },
+      {
+        id: randomUUID(),
+        title: 'Notebook Eksklusif',
+        description: 'Buku catatan premium berlogo PSA, cocok untuk aktivitas harian selama OJT.',
+        points_cost: 100,
+        stock: 10,
+        category: 'Alat Tulis',
+        image_url: '',
+        image_public_id: '',
+      },
+      {
+        id: randomUUID(),
+        title: 'Tumbler PSA',
+        description: 'Tumbler anti-tumpah berlogo PSA dengan kapasitas 500ml.',
+        points_cost: 250,
+        stock: 5,
+        category: 'Merchandise',
+        image_url: '',
+        image_public_id: '',
+      },
+      {
+        id: randomUUID(),
+        title: 'Kaos OJT Vokasi',
+        description: 'Kaos resmi peserta OJT Vokasi PSA. Tersedia size S, M, L, XL.',
+        points_cost: 500,
+        stock: 3,
+        category: 'Pakaian',
+        image_url: '',
+        image_public_id: '',
+      },
+      {
+        id: randomUUID(),
+        title: 'Voucher Pulsa 20K',
+        description: 'Voucher pulsa senilai Rp20.000 untuk semua operator.',
+        points_cost: 150,
+        stock: 15,
+        category: 'Voucher',
+        image_url: '',
+        image_public_id: '',
+      },
+    ];
+    for (const item of seedItems) {
+      await p.query(
+        `INSERT INTO reward_items (id, title, description, points_cost, stock, category, image_url, image_public_id, is_active, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
+        [item.id, item.title, item.description, item.points_cost, item.stock, item.category, item.image_url, item.image_public_id]
+      );
+    }
+    console.log(`[TiDB] ${seedItems.length} hadiah default ditambahkan ke katalog reward.`);
+  }
 
   console.log(`[TiDB] Skema aplikasi siap: ${tableMigrations.length} tabel.`);
 }

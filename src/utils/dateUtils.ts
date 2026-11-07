@@ -7,6 +7,8 @@ export const INDONESIAN_DAYS = [
   'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
 ];
 
+export const WORK_DAYS = [1, 2, 3, 4, 5] as const;
+
 export function getTodayDateString(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -63,5 +65,5 @@ export function isWeekend(dateStr: string): boolean {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   const day = date.getDay();
-  return day === 0 || day === 6; // Sunday or Saturday
+  return day === 0 || day === 6;
 }

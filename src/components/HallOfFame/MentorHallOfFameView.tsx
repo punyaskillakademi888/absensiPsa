@@ -3,7 +3,7 @@ import { Award, RotateCcw, Trophy } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { MentorHallOfFameEntry } from '../../types';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 
 export const MentorHallOfFameView: React.FC = () => {
   const { currentUser, resetTraineeHallOfFamePoints } = useApp();
@@ -55,26 +55,24 @@ export const MentorHallOfFameView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E4EAF0] pb-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#4C83B5]">APRESIASI INSTRUKTUR</p>
-          <h1 className="mt-1 text-2xl font-bold text-[#123B59]">Hall of Fame Mentor</h1>
-          <p className="mt-1 text-sm text-[#6F7F8D]">Poin mentor berasal dari tugas peserta yang disetujui, dibagi jumlah peserta aktif pada kejuruan misi.</p>
-          <MobileHeaderStatus />
-        </div>
+      <PageHeader
+        eyebrow="APRESIASI INSTRUKTUR"
+        title="Hall of Fame Mentor"
+        description="Poin mentor berasal dari tugas peserta yang disetujui, dibagi jumlah peserta aktif pada kejuruan misi."
+      >
         {currentUser.role === 'admin' && (
           <button
             type="button"
             onClick={handleResetTraineePoints}
             disabled={isResettingPoints}
-            className="surface flex items-center gap-2 rounded-xl border border-rose-200 px-3.5 py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+            className="flex items-center gap-2 rounded-xl border border-rose-200/50 bg-rose-500/15 px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-rose-500/30 disabled:opacity-60"
             title="Nolkan poin trainee, tanpa menghapus riwayat submission"
           >
             <RotateCcw className="h-4 w-4" />
             <span>{isResettingPoints ? 'Mereset...' : 'Reset Poin Peserta'}</span>
           </button>
         )}
-      </header>
+      </PageHeader>
 
       <section className="surface overflow-hidden rounded-2xl border border-[#E4EAF0]">
         <div className="flex items-center gap-2 border-b border-[#E4EAF0] bg-[#F8FAFB] px-5 py-4">

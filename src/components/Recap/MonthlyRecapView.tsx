@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import {
   FileSpreadsheet,
   FileText,
@@ -347,25 +347,15 @@ export const MonthlyRecapView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col items-start gap-3 pb-4 border-b border-[#E4EAF0]">
-        <div className="min-w-0 w-full">
-          <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase">
-            CATATAN KEHADIRAN & REKAPITULASI
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-[#123B59]">
-              {isTrainee ? 'Rekapitulasi Presensi Saya' : 'Rekapitulasi Presensi Bulanan'}
-            </h1>
-          </div>
-          <p className="text-xs text-[#6F7F8D] mt-1">
-            {isTrainee
-              ? `Ringkasan kehadiran mandiri · Periode ${recapData.monthName} ${selectedYear}`
-              : `Ringkasan Statistik Kehadiran Bulanan · Periode ${recapData.monthName} ${selectedYear} (${filteredSummaries.length} Peserta)`}
-          </p>
-          <MobileHeaderStatus />
-        </div>
+      <PageHeader
+        eyebrow="CATATAN KEHADIRAN & REKAPITULASI"
+        title={isTrainee ? 'Rekapitulasi Presensi Saya' : 'Rekapitulasi Presensi Bulanan'}
+        description={isTrainee
+          ? `Ringkasan kehadiran mandiri · Periode ${recapData.monthName} ${selectedYear}`
+          : `Ringkasan Statistik Kehadiran Bulanan · Periode ${recapData.monthName} ${selectedYear} (${filteredSummaries.length} Peserta)`}
+      />
 
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {currentUser.role === 'admin' && (
             <button

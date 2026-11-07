@@ -15,37 +15,30 @@ import { MissionManagementView } from './components/Missions/MissionManagementVi
 import { HallOfFameView } from './components/HallOfFame/HallOfFameView';
 import { MentorHallOfFameView } from './components/HallOfFame/MentorHallOfFameView';
 import { DailyReportView } from './components/DailyReport/DailyReportView';
+import { MentorDailyReportView } from './components/DailyReport/MentorDailyReportView';
+import { RewardStoreView } from './components/Rewards/RewardStoreView';
 import { HeaderStatusContext } from './components/MobileHeaderStatus';
 import psaLogo from './assets/2D PSA LOGO.png';
 import {
   Menu,
-  Clock,
   LayoutDashboard,
   CalendarCheck,
   FileText,
   UserRound,
   FileSpreadsheet,
 } from 'lucide-react';
-import { INDONESIAN_DAYS, INDONESIAN_MONTHS } from './utils/dateUtils';
 
 const MainLayout: React.FC = () => {
   const { currentUser, activeTab, setActiveTab, isAuthenticated, authReady } = useApp();
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [liveClock, setLiveClock] = useState('00.00.00');
-  const [headerDate, setHeaderDate] = useState('');
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       setLiveClock(`${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`);
-
-      const dayName = INDONESIAN_DAYS[now.getDay()];
-      const day = now.getDate();
-      const monthName = INDONESIAN_MONTHS[now.getMonth()];
-      const year = now.getFullYear();
-      setHeaderDate(`${dayName}, ${day} ${monthName} ${year}`);
     };
 
     updateTime();
@@ -95,8 +88,16 @@ const MainLayout: React.FC = () => {
       case 'laporan-harian':
         return <DailyReportView />;
 
+      case 'laporan-mentor':
+        return currentUser.role === 'admin' || currentUser.role === 'mentor'
+          ? <MentorDailyReportView />
+          : <TraineeDashboard />;
+
       case 'hall-of-fame':
         return currentUser.role === 'admin' ? <MentorHallOfFameView /> : <HallOfFameView />;
+
+      case 'reward-store':
+        return <RewardStoreView />;
 
       case 'rekap':
         return <MonthlyRecapView />;
@@ -125,11 +126,6 @@ const MainLayout: React.FC = () => {
       ? 'Mentor'
       : 'Peserta';
 
-  // Keep the welcome/date banner on attendance and mentor verification pages.
-  // Other pages already have their own title and should not repeat the greeting.
-  const showAttendanceHeader =
-    activeTab === 'dashboard' || activeTab === 'presensi' || activeTab === 'verifikasi-mentor';
-
   return (
     <div className="min-h-screen bg-[#F4F6F8] text-[#123B59] flex flex-col font-sans">
       {/* Sidebar Navigation (Fixed on desktop, drawer on mobile) */}
@@ -157,55 +153,6 @@ const MainLayout: React.FC = () => {
             </span>
           </div>
         </div>
-        {/* Top Header matching style.html */}
-        <header
-          className={`flex w-full flex-col justify-between gap-3 lg:gap-4 lg:flex-row lg:items-center ${
-            showAttendanceHeader
-              ? 'mb-4 lg:mb-6'
-              : 'mb-4 h-auto overflow-visible lg:relative lg:z-10 lg:mb-0 lg:h-0'
-          }`}
-        >
-          <div className="flex min-w-0 flex-col gap-3 lg:block">
-            {/* Attendance title and greeting; detail pages use their own page heading. */}
-            {showAttendanceHeader && (
-              <div>
-                <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5]">
-                  PRESENSI MAGANG HARIAN
-                </p>
-                <h1 className="mt-1 font-bold text-2xl lg:text-3xl text-[#123B59] tracking-tight">
-                  Selamat datang, {currentUser.name}
-                </h1>
-                <p className="mt-0.5 text-sm text-[#6F7F8D]">{headerDate}</p>
-              </div>
-            )}
-
-          </div>
-
-          {/* Current time and authenticated role */}
-          <div
-            className={`surface flex w-fit max-w-full flex-wrap items-center gap-3 self-start rounded-2xl px-3.5 py-2.5 sm:self-end lg:flex-nowrap lg:self-auto ${
-              showAttendanceHeader ? '' : 'hidden lg:flex'
-            } ${
-              showAttendanceHeader ? '' : 'lg:absolute lg:right-0 lg:top-0'
-            }`}
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2F8] text-[#4C83B5]">
-              <Clock className="h-4 w-4" />
-            </span>
-            <div className="pr-2">
-              <p className="text-[9px] font-bold tracking-[.1em] text-[#6F7F8D]">
-                WAKTU SAAT INI
-              </p>
-              <p className="text-base font-bold text-[#123B59] tabular-nums">
-                {liveClock} WIB
-              </p>
-            </div>
-            <span className="rounded-xl border border-[#E4EAF0] bg-[#F4F6F8] px-3 py-2 text-xs font-semibold text-[#123B59]">
-              {roleBadgeLabel}
-            </span>
-          </div>
-        </header>
-
         {/* Page Content View */}
         <HeaderStatusContext.Provider value={{ liveClock, roleBadgeLabel }}>
           <main key={activeTab} className="page-enter min-w-0 w-full flex-1">{renderContent()}</main>

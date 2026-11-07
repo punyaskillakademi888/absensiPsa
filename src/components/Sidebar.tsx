@@ -14,11 +14,13 @@ import {
   Target,
   Clock,
   BookOpen,
+  ClipboardList,
   UserRound,
   Sun,
   Moon,
   Monitor,
-  Check
+  Check,
+  Gift
 } from 'lucide-react';
 import { INDONESIAN_DAYS, INDONESIAN_MONTHS, getTodayDateString } from '../utils/dateUtils';
 import { getMentorKejuruanIds } from '../utils/mentorKejuruan';
@@ -145,7 +147,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return [
         { id: 'verifikasi-mentor', label: 'Verifikasi Mentor', icon: CheckCircle2, badge: pendingMentorVerifications },
         { id: 'laporan-harian', label: 'Laporan Harian', icon: BookOpen, badge: pendingDailyReportsCount },
+        { id: 'laporan-mentor', label: 'Laporan Mentor', icon: ClipboardList },
         { id: 'hall-of-fame', label: 'Hall of Fame Mentor', icon: Trophy },
+        { id: 'reward-store', label: 'Reward Store', icon: Gift },
         { id: 'rekap', label: 'Rekapitulasi Presensi', icon: FileSpreadsheet },
         { id: 'peserta', label: 'Peserta & Kejuruan', icon: Users },
         { id: 'izin', label: 'Izin & Sakit', icon: FileText, badge: pendingLeavesCount },
@@ -156,8 +160,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return [
         { id: 'presensi', label: 'Verifikasi Peserta', icon: CalendarCheck, badge: pendingTraineeVerifications },
         { id: 'laporan-harian', label: 'Laporan Harian', icon: BookOpen, badge: pendingDailyReportsCount },
+        { id: 'laporan-mentor', label: 'Laporan Mentor', icon: ClipboardList },
         { id: 'misi', label: 'Misi Kejuruan', icon: Target, badge: pendingMissionsCount },
         { id: 'hall-of-fame', label: 'Hall of Fame Peserta', icon: Trophy },
+        { id: 'reward-store', label: 'Reward Store', icon: Gift },
         { id: 'rekap', label: 'Rekap Bulanan', icon: FileSpreadsheet },
         { id: 'izin', label: 'Verifikasi Izin', icon: FileText, badge: pendingLeavesCount },
         { id: 'profil', label: 'Profil Saya', icon: UserRound }
@@ -168,6 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'laporan-harian', label: 'Laporan Harian', icon: BookOpen },
         { id: 'misi', label: 'Misi Kejuruan', icon: Target },
         { id: 'hall-of-fame', label: 'Hall of Fame', icon: Trophy },
+        { id: 'reward-store', label: 'Tukar Poin', icon: Gift },
         { id: 'rekap', label: 'Rekap Kehadiran', icon: FileSpreadsheet },
         { id: 'izin', label: 'Pengajuan Izin', icon: FileText },
         { id: 'profil', label: 'Profil Saya', icon: UserRound }

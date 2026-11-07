@@ -1,10 +1,12 @@
 import { Router, Response } from 'express';
+import type { PoolConnection } from 'mysql2/promise';
 import { randomUUID } from 'node:crypto';
 import { getPool } from './db.js';
 import { getJakartaDateTime } from './attendanceAutoCheckout.js';
 import { completeExpiredMissions } from './missionLifecycle.js';
 import { authenticateToken, AuthenticatedRequest } from './auth.js';
 import { canonicalKejuruanCode } from './kejuruanCodes.js';
+import { WORK_DAYS } from '../src/utils/dateUtils.js';
 import {
   computeLatePenalty,
   computeAbsentPenalty,
@@ -38,16 +40,7 @@ const loadPenaltySettings = async (): Promise<LatePenaltySettings> => {
 
 // workDays tersimpan sebagai JSON (1 = Senin ... 0 = Minggu).
 const parseWorkDays = (setting: any): number[] => {
-  try {
-    const parsed = typeof setting?.work_days === 'string' ? JSON.parse(setting.work_days) : setting?.work_days;
-    if (Array.isArray(parsed)) {
-      const days = parsed.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
-      if (days.length) return days;
-    }
-  } catch {
-    // Jatuh ke hari kerja default di bawah.
-  }
-  return [1, 2, 3, 4, 5];
+  return [...WORK_DAYS];
 };
 
 // Tanggal yang dikecualikan dari hitungan "tidak absen": hari dengan check-in
@@ -130,6 +123,13 @@ const mapReport = (r: any) => ({
   photoName: r.photo_name || undefined, submissionLink: r.submission_link || undefined, status: r.status,
   submittedAt: dateTimeText(r.submitted_at), reviewedBy: r.reviewed_by || undefined,
   reviewedAt: dateTimeText(r.reviewed_at), reviewNotes: r.review_notes || undefined,
+});
+const mapMentorReport = (r: any) => ({
+  id: r.id, mentorId: r.mentor_id, mentorName: r.mentor_name, mentorNim: r.mentor_nim,
+  kejuruanId: r.kejuruan_id || undefined, kejuruanName: r.kejuruan_name || undefined,
+  date: dateText(r.report_date), activities: r.activities, achievements: r.achievements || '',
+  obstacles: r.obstacles || '', nextPlan: r.next_plan || '',
+  submittedAt: dateTimeText(r.submitted_at),
 });
 
 const assignedProgramNames = (user: { kejuruanName?: string | null }) =>
@@ -276,7 +276,7 @@ appDataRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res:
         absentPointPenaltyPerDay: normalizeAbsentPointPenaltyPerDay(
           setting.absent_point_penalty_per_day ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
         ),
-        workDays: typeof setting.work_days === 'string' ? JSON.parse(setting.work_days) : setting.work_days,
+        workDays: parseWorkDays(setting),
         officeLocation: legacyOfficePin ? {
           ...officeLocation,
           lat: -6.921045982595817,
@@ -416,17 +416,27 @@ appDataRouter.post('/hall-of-fame/reset-trainee-points', authenticateToken, asyn
     return res.status(403).json({ success: false, message: 'Hanya admin yang dapat mereset poin Hall of Fame peserta.' });
   }
 
+  const connection = await getPool().getConnection();
   try {
-    const [result]: any = await getPool().query('UPDATE mission_submissions SET points = 0 WHERE points <> 0');
+    await connection.beginTransaction();
+    await connection.query(
+      `DELETE ledger FROM point_ledger ledger
+       INNER JOIN mission_submissions submission ON submission.id = ledger.reference_id`
+    );
+    const [result]: any = await connection.query('UPDATE mission_submissions SET points = 0 WHERE points <> 0');
     const count = Number(result?.affectedRows || 0);
+    await connection.commit();
     return res.json({
       success: true,
       count,
       message: `Poin HOF peserta berhasil direset untuk ${count} submission. Riwayat submission tetap tersimpan.`,
     });
   } catch (error: any) {
+    await connection.rollback();
     console.error('[Reset Trainee HOF Points Error]', error);
     return res.status(500).json({ success: false, count: 0, message: 'Gagal mereset poin HOF peserta.' });
+  } finally {
+    connection.release();
   }
 });
 
@@ -443,6 +453,12 @@ appDataRouter.post('/missions/reset', authenticateToken, async (req: Authenticat
     let submissionCount = 0;
     if (missionIds.length) {
       const placeholders = missionIds.map(() => '?').join(',');
+      await connection.query(
+        `DELETE ledger FROM point_ledger ledger
+         INNER JOIN mission_submissions submission ON submission.id = ledger.reference_id
+         WHERE submission.mission_id IN (${placeholders})`,
+        missionIds
+      );
       const [result]: any = await connection.query(`DELETE FROM mission_submissions WHERE mission_id IN (${placeholders})`, missionIds);
       submissionCount = Number(result?.affectedRows || 0);
     }
@@ -505,7 +521,7 @@ appDataRouter.put('/settings', authenticateToken, async (req: AuthenticatedReque
        absent_point_penalty_per_day=VALUES(absent_point_penalty_per_day),
        updated_by=VALUES(updated_by)`,
       [settings.startTime, settings.lateLimitTime, settings.endTime, settings.allowCheckoutStart,
-        JSON.stringify(settings.workDays), JSON.stringify({ ...location, lat, lng, radiusMeters }),
+        JSON.stringify([...WORK_DAYS]), JSON.stringify({ ...location, lat, lng, radiusMeters }),
         latePointPenaltyPerMinute, absentPointPenaltyPerDay, req.user.id]
     );
     return res.json({ success: true, message: 'Pengaturan lokasi presensi berhasil disimpan.' });
@@ -530,6 +546,7 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
     return res.status(400).json({ success: false, message: 'Data presensi tidak valid.' });
   }
 
+  let connection: PoolConnection | undefined;
   try {
     const targetUserId = user.role === 'trainee' ? user.id : String(input.userId || user.id);
     if (user.role === 'trainee' && !['hadir', 'terlambat'].includes(input.status)) {
@@ -561,6 +578,9 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
       }
     }
 
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [target.id]);
     const isReview = user.role === 'admin' || (user.role === 'mentor' && target.id !== user.id);
     const requestedVerification = ['verified', 'rejected'].includes(input.verificationStatus)
       ? input.verificationStatus
@@ -571,23 +591,50 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
       : null;
     const verifiedAt = verifiedBy ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
     const coordinates = input.coordinates || {};
-    const [existingRows] = await pool.query<any[]>(
+    const [existingRows] = await connection.query<any[]>(
       'SELECT * FROM attendance_records WHERE user_id = ? AND attendance_date = ? ORDER BY created_at ASC LIMIT 1',
       [target.id, date]
     );
     const existingRecord = existingRows[0];
+    const { date: todayWib, time: currentTimeWib } = getJakartaDateTime();
+    const requestedDay = new Date(`${date}T00:00:00Z`).getUTCDay();
+    const currentDay = new Date(`${todayWib}T00:00:00Z`).getUTCDay();
+    if (checkInTime && (requestedDay === 0 || requestedDay === 6) && !existingRecord?.check_in_time) {
+      await connection.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.',
+      });
+    }
+    if (target.id === user.id && checkOutTime &&
+        (requestedDay === 0 || requestedDay === 6 || currentDay === 0 || currentDay === 6)) {
+      await connection.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.',
+      });
+    }
     if (target.id === user.id && checkOutTime && !existingRecord?.check_in_time && !checkInTime) {
+      await connection.rollback();
       return res.status(400).json({ success: false, message: 'Check-out tidak dapat dicatat sebelum check-in.' });
     }
     if (target.id === user.id && checkInTime) {
-      const { date: todayWib, time: currentTimeWib } = getJakartaDateTime();
+      if (date === todayWib && (currentDay === 0 || currentDay === 6)) {
+        await connection.rollback();
+        return res.status(403).json({
+          success: false,
+          message: 'Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.',
+        });
+      }
       if (date !== todayWib && !existingRecord?.check_in_time) {
+        await connection.rollback();
         return res.status(403).json({
           success: false,
           message: 'Check-in hanya dapat dicatat untuk tanggal hari ini.',
         });
       }
       if (date === todayWib && currentTimeWib >= '19:00:00' && !existingRecord?.check_in_time) {
+        await connection.rollback();
         return res.status(403).json({
           success: false,
           message: 'Batas check-in hari ini sudah berakhir pukul 19.00 WIB.',
@@ -605,6 +652,7 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
     // A retry or stale browser state must never replace the original check-in
     // time or agenda. Return the persisted row as the source of truth.
     if (existingRecord && target.id === user.id && checkInTime && !checkOutTime && existingRecord.check_in_time) {
+      await connection.rollback();
       return res.json({
         success: true,
         duplicate: true,
@@ -618,7 +666,7 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
     const id = existingRecord?.id || `att-${randomUUID()}`;
     const canWriteReview = isReview ? 1 : 0;
     const protectExistingCheckIn = target.id === user.id && !!checkInTime && !checkOutTime;
-    const [writeResult] = await pool.query<any>(
+    const [writeResult] = await connection.query<any>(
       `INSERT INTO attendance_records (
         id,user_id,user_name,user_nim,user_role,kejuruan_id,kejuruan_name,attendance_date,
         check_in_time,check_out_time,status,verification_status,verified_by,verified_at,
@@ -647,9 +695,9 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
     // Read back by primary key first so the response identifies the exact row
     // affected by INSERT/ON DUPLICATE KEY, even when an older row uses a
     // non-canonical ID. Fall back to the natural key for concurrent upserts.
-    let [savedRows] = await pool.query<any[]>('SELECT * FROM attendance_records WHERE id = ? LIMIT 1', [id]);
+    let [savedRows] = await connection.query<any[]>('SELECT * FROM attendance_records WHERE id = ? LIMIT 1', [id]);
     if (!savedRows[0]) {
-      [savedRows] = await pool.query<any[]>(
+      [savedRows] = await connection.query<any[]>(
         'SELECT * FROM attendance_records WHERE user_id = ? AND attendance_date = ? LIMIT 1',
         [target.id, date]
       );
@@ -661,14 +709,18 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
     if (String(savedRows[0].user_id) !== String(target.id) || dateText(savedRows[0].attendance_date) !== date) {
       throw new Error(`Record hasil simpan tidak cocok dengan pemilik/tanggal request (user=${target.id}, date=${date}, id=${id}).`);
     }
+    await connection.commit();
     return res.json({
       success: true,
       message: 'Presensi berhasil disimpan.',
       attendanceRecord: mapAttendance(savedRows[0]),
     });
   } catch (error: any) {
+    if (connection) await connection.rollback();
     console.error('[Attendance Save Error]', error);
     return res.status(500).json({ success: false, message: 'Presensi gagal disimpan ke database.', error: error.message });
+  } finally {
+    connection?.release();
   }
 });
 
@@ -749,6 +801,145 @@ appDataRouter.post('/daily-reports', authenticateToken, async (req: Authenticate
   }
 });
 
+appDataRouter.get('/mentor-daily-reports', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  if (!['mentor', 'admin'].includes(req.user!.role)) {
+    return res.status(403).json({ success: false, message: 'Hanya admin dan mentor yang dapat melihat laporan mentor.' });
+  }
+  try {
+    const [rows] = await getPool().query<any[]>(
+      'SELECT * FROM mentor_daily_reports ORDER BY report_date DESC, submitted_at DESC'
+    );
+    return res.json({ success: true, reports: rows.map(mapMentorReport) });
+  } catch (error: any) {
+    console.error('[Mentor Daily Reports Load Error]', error);
+    return res.status(500).json({ success: false, message: 'Laporan harian mentor gagal dimuat.' });
+  }
+});
+
+appDataRouter.post('/mentor-daily-reports', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (user.role !== 'mentor') {
+    return res.status(403).json({ success: false, message: 'Hanya mentor yang dapat mengirim laporan harian.' });
+  }
+
+  const input = req.body || {};
+  const reportDate = String(input.date || '');
+  const activities = String(input.activities || '').trim();
+  const achievements = String(input.achievements || '').trim();
+  const obstacles = String(input.obstacles || '').trim();
+  const nextPlan = String(input.nextPlan || '').trim();
+  const dateParts = reportDate.split('-').map(Number);
+  const parsedDate = dateParts.length === 3 ? new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2])) : null;
+  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(reportDate) && parsedDate !== null &&
+    parsedDate.getUTCFullYear() === dateParts[0] &&
+    parsedDate.getUTCMonth() === dateParts[1] - 1 &&
+    parsedDate.getUTCDate() === dateParts[2];
+
+  if (!isValidDate || reportDate > getJakartaDateTime().date || !activities ||
+      [activities, achievements, obstacles, nextPlan].some(value => value.length > 10000)) {
+    return res.status(400).json({ success: false, message: 'Tanggal laporan harus valid dan tidak di masa depan; kegiatan wajib diisi (maksimal 10.000 karakter per bagian).' });
+  }
+
+  const submittedAt = new Date().toISOString();
+  const reportId = randomUUID();
+  try {
+    await getPool().query(
+      `INSERT INTO mentor_daily_reports
+       (id, mentor_id, mentor_name, mentor_nim, kejuruan_id, kejuruan_name, report_date, activities, achievements, obstacles, next_plan, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [reportId, user.id, user.name, user.nim || '', user.kejuruanId || null, user.kejuruanName || null,
+        reportDate, activities, achievements, obstacles, nextPlan, dateTimeValue(submittedAt)]
+    );
+    const [rows] = await getPool().query<any[]>(
+      'SELECT * FROM mentor_daily_reports WHERE mentor_id = ? AND report_date = ? LIMIT 1',
+      [user.id, reportDate]
+    );
+    const saved = rows[0];
+    if (!saved) return res.status(500).json({ success: false, message: 'Laporan tersimpan tetapi gagal dibaca ulang.' });
+    return res.json({ success: true, message: 'Laporan harian mentor berhasil disimpan.', report: mapMentorReport(saved) });
+  } catch (error: any) {
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: 'Laporan untuk tanggal ini sudah ada. Gunakan tombol Edit untuk memperbaruinya.' });
+    }
+    console.error('[Mentor Daily Report Save Error]', error);
+    return res.status(500).json({ success: false, message: 'Laporan harian mentor gagal disimpan.' });
+  }
+});
+
+appDataRouter.patch('/mentor-daily-reports/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (user.role !== 'mentor') {
+    return res.status(403).json({ success: false, message: 'Hanya mentor yang dapat mengubah laporan miliknya.' });
+  }
+
+  const input = req.body || {};
+  const reportDate = String(input.date || '');
+  const activities = String(input.activities || '').trim();
+  const achievements = String(input.achievements || '').trim();
+  const obstacles = String(input.obstacles || '').trim();
+  const nextPlan = String(input.nextPlan || '').trim();
+  const dateParts = reportDate.split('-').map(Number);
+  const parsedDate = dateParts.length === 3 ? new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2])) : null;
+  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(reportDate) && parsedDate !== null &&
+    parsedDate.getUTCFullYear() === dateParts[0] &&
+    parsedDate.getUTCMonth() === dateParts[1] - 1 &&
+    parsedDate.getUTCDate() === dateParts[2];
+
+  if (!isValidDate || reportDate > getJakartaDateTime().date || !activities ||
+      [activities, achievements, obstacles, nextPlan].some(value => value.length > 10000)) {
+    return res.status(400).json({ success: false, message: 'Tanggal laporan harus valid dan tidak di masa depan; kegiatan wajib diisi (maksimal 10.000 karakter per bagian).' });
+  }
+
+  try {
+    const [result]: any = await getPool().query(
+      `UPDATE mentor_daily_reports
+       SET report_date = ?, activities = ?, achievements = ?, obstacles = ?, next_plan = ?, submitted_at = ?
+       WHERE id = ? AND mentor_id = ?`,
+      [reportDate, activities, achievements, obstacles, nextPlan, dateTimeValue(new Date().toISOString()), req.params.id, user.id]
+    );
+    if (!result.affectedRows) {
+      const [rows] = await getPool().query<any[]>(
+        'SELECT id FROM mentor_daily_reports WHERE id = ? AND mentor_id = ? LIMIT 1',
+        [req.params.id, user.id]
+      );
+      if (!rows.length) return res.status(404).json({ success: false, message: 'Laporan tidak ditemukan atau bukan milik Anda.' });
+    }
+    const [savedRows] = await getPool().query<any[]>(
+      'SELECT * FROM mentor_daily_reports WHERE id = ? AND mentor_id = ? LIMIT 1',
+      [req.params.id, user.id]
+    );
+    const saved = savedRows[0];
+    if (!saved) return res.status(404).json({ success: false, message: 'Laporan tidak ditemukan atau bukan milik Anda.' });
+    return res.json({ success: true, message: 'Laporan harian mentor berhasil diperbarui.', report: mapMentorReport(saved) });
+  } catch (error: any) {
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: 'Anda sudah memiliki laporan untuk tanggal tersebut.' });
+    }
+    console.error('[Mentor Daily Report Update Error]', error);
+    return res.status(500).json({ success: false, message: 'Laporan harian mentor gagal diperbarui.' });
+  }
+});
+
+appDataRouter.delete('/mentor-daily-reports/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (user.role !== 'mentor') {
+    return res.status(403).json({ success: false, message: 'Hanya mentor yang dapat menghapus laporan miliknya.' });
+  }
+  try {
+    const [result]: any = await getPool().query(
+      'DELETE FROM mentor_daily_reports WHERE id = ? AND mentor_id = ?',
+      [req.params.id, user.id]
+    );
+    if (!result.affectedRows) {
+      return res.status(404).json({ success: false, message: 'Laporan tidak ditemukan atau bukan milik Anda.' });
+    }
+    return res.json({ success: true, message: 'Laporan harian berhasil dihapus.' });
+  } catch (error: any) {
+    console.error('[Mentor Daily Report Delete Error]', error);
+    return res.status(500).json({ success: false, message: 'Laporan harian mentor gagal dihapus.' });
+  }
+});
+
 appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const body = req.body || {};
@@ -799,6 +990,7 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
     const penaltySettings = await loadPenaltySettings();
     for (const r of lists.attendanceRecords) {
       if (user.role === 'trainee' && !own(r)) continue;
+      await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [r.userId]);
       const reviewUpdate = user.role === 'trainee'
         ? 'user_name=VALUES(user_name),user_nim=VALUES(user_nim),check_in_time=VALUES(check_in_time),check_out_time=VALUES(check_out_time),work_mode=COALESCE(VALUES(work_mode),work_mode),status=VALUES(status),location=VALUES(location),latitude=VALUES(latitude),longitude=VALUES(longitude),notes=VALUES(notes),photo_url=VALUES(photo_url),late_minutes=VALUES(late_minutes),late_penalty_points=VALUES(late_penalty_points)'
         : 'user_name=VALUES(user_name),user_nim=VALUES(user_nim),user_role=VALUES(user_role),kejuruan_id=VALUES(kejuruan_id),kejuruan_name=VALUES(kejuruan_name),attendance_date=VALUES(attendance_date),check_in_time=VALUES(check_in_time),check_out_time=VALUES(check_out_time),work_mode=COALESCE(VALUES(work_mode),work_mode),status=VALUES(status),verification_status=VALUES(verification_status),verified_by=VALUES(verified_by),verified_at=VALUES(verified_at),location=VALUES(location),latitude=VALUES(latitude),longitude=VALUES(longitude),notes=VALUES(notes),photo_url=VALUES(photo_url),rejection_reason=VALUES(rejection_reason),late_minutes=VALUES(late_minutes),late_penalty_points=VALUES(late_penalty_points)';
@@ -815,6 +1007,7 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
 
     for (const r of lists.leaveRequests) {
       if (user.role === 'trainee' && !own(r)) continue;
+      await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [r.userId]);
       const reviewUpdate = user.role === 'trainee'
         ? 'reason=VALUES(reason),attachment_name=VALUES(attachment_name),attachment_url=VALUES(attachment_url)'
         : 'status=VALUES(status),reviewed_by=VALUES(reviewed_by),reviewed_at=VALUES(reviewed_at),review_notes=VALUES(review_notes),reason=VALUES(reason),attachment_name=VALUES(attachment_name),attachment_url=VALUES(attachment_url)';

@@ -16,7 +16,7 @@ import {
   INITIAL_KEJURUAN,
   INITIAL_SETTINGS,
 } from '../data/mockData';
-import { getTodayDateString, getCurrentTimeWIB } from '../utils/dateUtils';
+import { getTodayDateString, getCurrentTimeWIB, isWeekend, WORK_DAYS } from '../utils/dateUtils';
 import { computeLatePenalty, computeAbsentPenalty, isLateCheckIn, normalizeLatePointPenaltyPerMinute, normalizeAbsentPointPenaltyPerDay, DEFAULT_LATE_POINT_PENALTY_PER_MINUTE } from '../utils/latePenalty';
 import { generate8DigitLoginCode, generateDefaultPassword } from '../utils/userExcelUtils';
 import { canonicalizeKejuruanCatalog } from '../utils/kejuruanCodes';
@@ -536,6 +536,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Clock In
   const clockIn = async (notes?: string, photoUrl?: string, coordinates?: { lat: number; lng: number }, workMode: 'WFO' | 'WFH' = 'WFO'): Promise<{ success: boolean; message: string }> => {
     const today = getTodayDateString();
+    if (isWeekend(today)) {
+      return { success: false, message: 'Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.' };
+    }
     const existing = getTodayRecordForUser(currentUser.id);
 
     if (existing && existing.checkInTime) {
@@ -644,6 +647,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Koordinat GPS tetap dicatat tanpa batasan radius kantor, sehingga peserta/mentor dapat check-out dari mana saja.
   const clockOut = async (notes?: string, coordinates?: { lat: number; lng: number }, _workMode?: 'WFO' | 'WFH'): Promise<{ success: boolean; message: string }> => {
     const today = getTodayDateString();
+    if (isWeekend(today)) {
+      return { success: false, message: 'Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.' };
+    }
     const existing = getTodayRecordForUser(currentUser.id);
 
     if (!existing || !existing.checkInTime) {
@@ -1032,6 +1038,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       absentPointPenaltyPerDay: normalizeAbsentPointPenaltyPerDay(
         mergedSettings.absentPointPenaltyPerDay ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
       ),
+      workDays: [...WORK_DAYS],
     };
     try {
       await api.saveAttendanceSettings(updatedSettings);

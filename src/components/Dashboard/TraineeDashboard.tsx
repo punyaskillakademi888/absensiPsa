@@ -24,9 +24,11 @@ import {
   formatShortDate,
   INDONESIAN_MONTHS,
   INDONESIAN_DAYS,
-  getCurrentTimeWIB
+  getCurrentTimeWIB,
+  isWeekend
 } from '../../utils/dateUtils';
 import { exportToPDF } from '../../utils/exportUtils';
+import { PageHeader } from '../PageHeader';
 
 export const TraineeDashboard: React.FC = () => {
   const {
@@ -42,6 +44,7 @@ export const TraineeDashboard: React.FC = () => {
   } = useApp();
 
   const today = getTodayDateString();
+  const isHoliday = isWeekend(today);
   const todayRecord = getTodayRecordForUser(currentUser.id);
   const [currentYear, currentMonth] = today.split('-').map(Number);
   const monthName = INDONESIAN_MONTHS[currentMonth - 1];
@@ -93,7 +96,7 @@ export const TraineeDashboard: React.FC = () => {
     const prefix = `${currentYear}-${monthStr}`;
 
     myRecords.forEach(r => {
-      if (r.date.startsWith(prefix)) {
+      if (r.date.startsWith(prefix) && !isWeekend(r.date.slice(0, 10))) {
         if (r.status === 'hadir') hadir++;
         else if (r.status === 'terlambat') telat++;
         else if (r.status === 'izin') izin++;
@@ -131,6 +134,10 @@ export const TraineeDashboard: React.FC = () => {
   };
 
   const handleAttendance = () => {
+    if (isHoliday) {
+      setLocationError('Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.');
+      return;
+    }
     if (!navigator.geolocation) {
       setLocationError('Browser atau perangkat ini tidak mendukung GPS.');
       return;
@@ -198,7 +205,13 @@ export const TraineeDashboard: React.FC = () => {
   let buttonLabel = 'Check-in Sekarang';
   let isButtonDisabled = false;
 
-  if (todayLeave) {
+  if (isHoliday) {
+    statusText = 'Hari Libur';
+    statusHelper = 'Hari Sabtu dan Minggu merupakan hari libur. Anda tidak perlu melakukan presensi.';
+    statusBadgeClass = 'bg-[#F4F6F8] text-[#6F7F8D]';
+    buttonLabel = 'Hari Libur';
+    isButtonDisabled = true;
+  } else if (todayLeave) {
     statusText = 'Izin Disetujui';
     statusHelper = 'Pengajuan izin/sakit Anda telah disetujui untuk hari ini.';
     statusBadgeClass = 'bg-[#EEF5FA] text-[#4C83B5]';
@@ -233,8 +246,16 @@ export const TraineeDashboard: React.FC = () => {
         </div>
       )}
 
+      <PageHeader
+        eyebrow="PRESENSI MAGANG HARIAN"
+        title={`Selamat datang, ${currentUser.name}`}
+        description={isHoliday
+          ? `Hari libur akhir pekan · ${formatIndonesianDate(today)}. Presensi tidak diperlukan.`
+          : formatIndonesianDate(today)}
+      />
+
       {/* Late Warning Banner — tampil jika belum check-in dan sudah lewat jam masuk */}
-      {isCurrentlyLate && !isCheckedIn && !todayLeave && (
+      {isCurrentlyLate && !isCheckedIn && !todayLeave && !isHoliday && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div>
@@ -398,7 +419,7 @@ export const TraineeDashboard: React.FC = () => {
               </div>
             </div>
 
-            {!isCheckedIn && !todayLeave && (
+            {!isCheckedIn && !todayLeave && !isHoliday && (
               <div className="mt-4">
                 <label htmlFor="attendance-daily-note" className="text-xs font-bold text-[#123B59]">
                   Catatan / Agenda Pelatihan Hari Ini (Opsional)
@@ -418,7 +439,7 @@ export const TraineeDashboard: React.FC = () => {
 
           {/* Big Action Button (Matching style.html) */}
           <div className="mt-5">
-            {!todayLeave && (
+            {!todayLeave && !isHoliday && (
               <fieldset className="mb-3" disabled={isCheckedIn}>
                 <legend className="mb-2 text-xs font-bold text-[#123B59]">Mode kerja hari ini</legend>
                 <div className="grid grid-cols-2 gap-2">
@@ -433,7 +454,9 @@ export const TraineeDashboard: React.FC = () => {
             <div className="mb-3 flex items-start gap-2 rounded-xl border border-[#C8DCEB] bg-[#EEF6FB] px-3.5 py-3 text-xs text-[#28618F]">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                {isCheckedIn
+                {isHoliday
+                  ? 'Tidak perlu melakukan check-in atau check-out pada hari libur.'
+                  : isCheckedIn
                   ? 'Check-out: Lokasi GPS tetap direkam tanpa batasan radius kantor (bisa check-out dari mana saja seperti WFA).'
                   : (todayRecord?.workMode || workMode) === 'WFO'
                     ? `Check-in WFO: GPS harus berada dalam radius ${settings.officeLocation.radiusMeters} m dari ${settings.officeLocation.name}.`
@@ -443,7 +466,16 @@ export const TraineeDashboard: React.FC = () => {
             {locationError && (
               <p role="alert" className="mb-3 rounded-xl border border-[#E3C4D0] bg-[#FCF3F6] px-3.5 py-3 text-xs font-semibold text-[#B84469]">{locationError}</p>
             )}
-            {!isCheckedIn ? (
+            {isHoliday ? (
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-5 py-4 font-bold text-slate-600 cursor-not-allowed"
+              >
+                <Calendar className="h-5 w-5" />
+                <span>Hari Libur · Presensi Tidak Diperlukan</span>
+              </button>
+            ) : !isCheckedIn ? (
               <button
                 type="button"
                 onClick={handleAttendance}
@@ -491,9 +523,9 @@ export const TraineeDashboard: React.FC = () => {
                 </h2>
               </div>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                isCheckedOut ? 'bg-[#EAF2F8] text-[#28618F]' : isCheckedIn ? 'bg-[#EEF5FA] text-[#4C83B5]' : 'bg-[#F4F6F8] text-[#6F7F8D]'
+                isHoliday ? 'bg-slate-100 text-slate-600' : isCheckedOut ? 'bg-[#EAF2F8] text-[#28618F]' : isCheckedIn ? 'bg-[#EEF5FA] text-[#4C83B5]' : 'bg-[#F4F6F8] text-[#6F7F8D]'
               }`}>
-                {isCheckedOut ? 'Selesai' : isCheckedIn ? 'Dalam Sesi' : 'Belum Absen'}
+                {isHoliday ? 'Hari Libur' : isCheckedOut ? 'Selesai' : isCheckedIn ? 'Dalam Sesi' : 'Belum Absen'}
               </span>
             </div>
 
@@ -515,7 +547,7 @@ export const TraineeDashboard: React.FC = () => {
                     CHECK-IN
                   </p>
                   <p className="mt-0.5 text-sm font-bold text-[#123B59]">
-                    {todayRecord?.checkInTime ? `${todayRecord.checkInTime} WIB` : 'Belum tercatat'}
+                    {todayRecord?.checkInTime ? `${todayRecord.checkInTime} WIB` : isHoliday ? 'Tidak diperlukan' : 'Belum tercatat'}
                   </p>
                   <p className="mt-0.5 text-xs text-[#6F7F8D]">
                     {todayRecord?.workMode || workMode} · {todayRecord?.notes || settings.officeLocation.name}
@@ -542,10 +574,10 @@ export const TraineeDashboard: React.FC = () => {
                     CHECK-OUT
                   </p>
                   <p className="mt-0.5 text-sm font-bold text-[#123B59]">
-                    {todayRecord?.checkOutTime ? `${todayRecord.checkOutTime} WIB` : 'Menunggu check-out'}
+                    {todayRecord?.checkOutTime ? `${todayRecord.checkOutTime} WIB` : isHoliday ? 'Tidak diperlukan' : 'Menunggu check-out'}
                   </p>
                   <p className="mt-0.5 text-xs text-[#6F7F8D]">
-                    {todayRecord?.checkOutTime ? 'Check-out telah berhasil tercatat.' : 'Lakukan check-out saat aktivitas selesai (lokasi GPS tercatat tanpa batasan radius).'}
+                    {todayRecord?.checkOutTime ? 'Check-out telah berhasil tercatat.' : isHoliday ? 'Tidak ada check-out pada hari libur.' : 'Lakukan check-out saat aktivitas selesai (lokasi GPS tercatat tanpa batasan radius).'}
                   </p>
                   {todayRecord?.checkOutCoordinates && (
                     <a className="mt-1 inline-flex text-xs font-semibold text-[#28618F] hover:underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${todayRecord.checkOutCoordinates.lat},${todayRecord.checkOutCoordinates.lng}`}>
@@ -619,6 +651,7 @@ export const TraineeDashboard: React.FC = () => {
 
               const rec = myRecords.find(r => r.date === item.dateStr);
               const isToday = item.dateStr === today;
+              const isHoliday = isWeekend(item.dateStr);
 
               let cellClass = 'bg-[#F8FAFB] text-[#6F7F8D]';
               if (rec?.status === 'hadir' || rec?.status === 'terlambat') {
@@ -627,12 +660,14 @@ export const TraineeDashboard: React.FC = () => {
                 cellClass = 'bg-[#EEF5FA] text-[#4C83B5]';
               } else if (rec?.status === 'alpha') {
                 cellClass = 'bg-[#FCF3F6] text-[#B84469]';
+              } else if (isHoliday) {
+                cellClass = 'bg-slate-100 text-slate-400';
               }
 
               return (
                 <div
                   key={item.dateStr}
-                  title={`${item.dateStr}: ${rec ? rec.status : 'Belum ada data'}`}
+                  title={`${item.dateStr}: ${isHoliday ? 'Libur akhir pekan' : rec ? rec.status : 'Belum ada data'}`}
                   className={`calendar-cell flex items-center justify-center rounded-xl text-xs font-bold transition ${cellClass} ${
                     isToday ? 'today ring-2 ring-[#4C83B5]' : ''
                   }`}
@@ -660,6 +695,10 @@ export const TraineeDashboard: React.FC = () => {
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-[#DDE5EB]"></span>
               <span>Belum ada data</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-slate-300"></span>
+              <span>Libur (Sabtu/Minggu)</span>
             </span>
           </div>
         </section>

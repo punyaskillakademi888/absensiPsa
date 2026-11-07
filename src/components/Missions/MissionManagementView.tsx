@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import { Mission, MissionDifficulty, MissionSubmission } from '../../types';
 import {
   Target,
@@ -462,25 +462,17 @@ export const MissionManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col items-start gap-4">
-        <div>
-          <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase mb-1">
-            Kejuruan Vokasi
-          </p>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#123B59]">
-            Misi &amp; Tugas Kejuruan
-          </h1>
-          <p className="text-xs text-[#6F7F8D] mt-0.5">
-            {isMentor
-              ? 'Rancang misi tantangan untuk peserta kejuruan Anda, validasi tugas, dan berikan poin penghargaan.'
-              : isTrainee
-              ? 'Kerjakan misi tantangan sesuai kejuruan Anda, kumpulkan poin, dan raih posisi teratas di Hall of Fame!'
-              : 'Kelola dan monitor seluruh misi tantangan vokasi lintas kejuruan.'}
-          </p>
-          <MobileHeaderStatus />
-        </div>
+      <PageHeader
+        eyebrow="KEJURUAN VOKASI"
+        title="Misi & Tugas Kejuruan"
+        description={isMentor
+          ? 'Rancang misi tantangan untuk peserta kejuruan Anda, validasi tugas, dan berikan poin penghargaan.'
+          : isTrainee
+          ? 'Kerjakan misi tantangan sesuai kejuruan Anda, kumpulkan poin, dan raih posisi teratas di Hall of Fame!'
+          : 'Kelola dan monitor seluruh misi tantangan vokasi lintas kejuruan.'}
+      />
 
+      <div className="flex flex-col items-start gap-4">
         <div className="flex w-full flex-wrap items-center gap-2">
           {/* Mission creation is managed by mentors. */}
           {isMentor && (
