@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import { api } from '../../services/api';
 import { UserRound, LockKeyhole, CheckCircle2, BadgeCheck } from 'lucide-react';
 
@@ -88,18 +88,11 @@ export const ProfileView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="pb-4 border-b border-[#E4EAF0]">
-        <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase">
-          PROFIL PENGGUNA
-        </p>
-        <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight text-[#123B59]">
-          Informasi Akun & Keamanan
-        </h1>
-        <p className="text-xs text-[#6F7F8D] mt-1">
-          Kelola data diri Anda dan ubah kata sandi untuk semua role pengguna.
-        </p>
-        <MobileHeaderStatus />
-      </div>
+      <PageHeader
+        eyebrow="PROFIL PENGGUNA"
+        title="Informasi Akun & Keamanan"
+        description="Kelola data diri Anda dan ubah kata sandi untuk semua role pengguna."
+      />
 
       <div className="surface rounded-2xl p-5 sm:p-6 border border-[#E4EAF0]">
         <div className="flex flex-col sm:flex-row items-start gap-4">

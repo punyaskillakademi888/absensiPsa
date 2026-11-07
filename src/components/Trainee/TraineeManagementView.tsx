@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import {
   Users,
   UserPlus,
@@ -394,19 +394,12 @@ export const TraineeManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col lg:items-start gap-4 pb-4 border-b border-[#E4EAF0]">
-        <div>
-          <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase">
-            ADMINISTRASI & MANAJEMEN AKUN
-          </p>
-          <h1 className="mt-1 text-2xl lg:text-3xl font-bold tracking-tight text-[#123B59]">
-            Kelola Akun Peserta & Instruktur
-          </h1>
-          <MobileHeaderStatus />
-        </div>
+      <PageHeader
+        eyebrow="ADMINISTRASI & MANAJEMEN AKUN"
+        title="Kelola Akun Peserta & Instruktur"
+      />
 
-        {/* Action Buttons: Add, Export, Import, Kejuruan, and Clear All */}
+      {/* Action Buttons: Add, Export, Import, Kejuruan, and Clear All */}
         <div className="flex w-full flex-wrap items-center gap-2">
           {currentUser?.role === 'admin' && (
             <button
@@ -465,7 +458,6 @@ export const TraineeManagementView: React.FC = () => {
             <span>Kejuruan</span>
           </button>
         </div>
-      </div>
 
       {/* Role Filter Tabs Strip */}
       <div className="flex flex-wrap items-center justify-between gap-3">

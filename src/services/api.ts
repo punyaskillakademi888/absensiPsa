@@ -1,6 +1,7 @@
-import {
+﻿import {
   User, Kejuruan, AttendanceRecord, LeaveRequest, AttendanceSettings,
-  Mission, MissionSubmission, DailyReport, TraineeHallOfFameEntry, MentorHallOfFameEntry
+  Mission, MissionSubmission, DailyReport, MentorDailyReport, TraineeHallOfFameEntry, MentorHallOfFameEntry,
+  RewardItem, RewardRedemption, RewardPointBalance
 } from '../types';
 
 function resolveApiBaseUrl(): string {
@@ -87,21 +88,23 @@ export const api = {
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      const isLocal = typeof window !== 'undefined' && (
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1'
-      );
+      const isLocal = typeof window !== 'undefined' && (() => {
+        const apiUrl = API_BASE_URL
+          ? new URL(API_BASE_URL, window.location.origin)
+          : window.location;
+        return apiUrl.hostname === 'localhost' || apiUrl.hostname === '127.0.0.1';
+      })();
       if (isLocal) {
         throw new Error(
           response.status === 404
-            ? 'Endpoint API lokal tidak ditemukan (404). Silakan restart server backend lokal (npm run server) agar membaca kode rute terbaru.'
-            : `Server backend lokal tidak merespons JSON (HTTP ${response.status}). Pastikan backend berjalan pada port 5000.`
+            ? `Endpoint API ${endpoint} tidak ditemukan (404). Restart backend lokal dengan "npm run server".`
+            : `Backend lokal tidak merespons JSON (HTTP ${response.status}) untuk ${endpoint}.`
         );
       }
       throw new Error(
         response.status === 404
-          ? 'API Vercel tidak ditemukan. Redeploy project setelah perubahan folder api/.'
-          : `API tidak merespons JSON (HTTP ${response.status}). Function backend mungkin gagal start.`
+          ? `Endpoint API ${endpoint} tidak ditemukan (404) pada server tujuan. Pastikan backend sudah memuat endpoint terbaru dan deploy ulang jika diperlukan.`
+          : `Server tujuan tidak merespons JSON (HTTP ${response.status}) untuk ${endpoint}.`
       );
     }
 
@@ -191,6 +194,30 @@ export const api = {
     return this.request('/api/app-data/daily-reports', {
       method: 'POST',
       body: JSON.stringify(report),
+    });
+  },
+
+  async getMentorDailyReports(): Promise<{ success: boolean; reports: MentorDailyReport[] }> {
+    return this.request('/api/app-data/mentor-daily-reports');
+  },
+
+  async submitMentorDailyReport(report: Pick<MentorDailyReport, 'date' | 'activities' | 'achievements' | 'obstacles' | 'nextPlan'>): Promise<{ success: boolean; message: string; report: MentorDailyReport }> {
+    return this.request('/api/app-data/mentor-daily-reports', {
+      method: 'POST',
+      body: JSON.stringify(report),
+    });
+  },
+
+  async updateMentorDailyReport(id: string, report: Pick<MentorDailyReport, 'date' | 'activities' | 'achievements' | 'obstacles' | 'nextPlan'>): Promise<{ success: boolean; message: string; report: MentorDailyReport }> {
+    return this.request(`/api/app-data/mentor-daily-reports/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(report),
+    });
+  },
+
+  async deleteMentorDailyReport(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/app-data/mentor-daily-reports/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
     });
   },
 
@@ -385,6 +412,68 @@ export const api = {
     return this.request<{ success: boolean; message: string; submission: MissionSubmission }>(`/api/missions/submissions/${encodeURIComponent(id)}/review`, {
       method: 'PATCH',
       body: JSON.stringify(review),
+    });
+  },
+
+  async getRewardItems(): Promise<{ success: boolean; items: RewardItem[] }> {
+    return this.request('/api/rewards/items');
+  },
+
+  async getRewardBalance(): Promise<{ success: boolean; balance: RewardPointBalance }> {
+    return this.request('/api/rewards/balance');
+  },
+
+  async getRewardRedemptions(): Promise<{ success: boolean; redemptions: RewardRedemption[] }> {
+    return this.request('/api/rewards/redemptions');
+  },
+
+  async redeemReward(rewardId: string, requestId: string): Promise<{
+    success: boolean;
+    redemption: RewardRedemption;
+    balance: RewardPointBalance;
+  }> {
+    return this.request('/api/rewards/redemptions', {
+      method: 'POST',
+      body: JSON.stringify({ rewardId, requestId }),
+    });
+  },
+
+  async createRewardItem(item: Omit<RewardItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<{
+    success: boolean;
+    item: RewardItem;
+  }> {
+    return this.request('/api/rewards/items', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    });
+  },
+
+  async updateRewardItem(id: string, item: Omit<RewardItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/api/rewards/items/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(item),
+    });
+  },
+
+  async deleteRewardItem(id: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/api/rewards/items/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async updateRewardRedemption(id: string, status: RewardRedemption['status'], notes: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/api/rewards/redemptions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
     });
   },
 };

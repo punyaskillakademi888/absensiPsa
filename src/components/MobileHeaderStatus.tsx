@@ -8,12 +8,12 @@ interface HeaderStatus {
 
 export const HeaderStatusContext = createContext<HeaderStatus | null>(null);
 
-export const MobileHeaderStatus: React.FC = () => {
+export const MobileHeaderStatus: React.FC<{ showOnDesktop?: boolean }> = ({ showOnDesktop = false }) => {
   const status = useContext(HeaderStatusContext);
   if (!status) return null;
 
   return (
-    <div className="surface mt-3 flex w-fit max-w-full flex-wrap items-center gap-3 rounded-2xl px-3.5 py-2.5 lg:hidden">
+    <div className={`surface flex w-fit max-w-full flex-wrap items-center gap-3 rounded-2xl px-3.5 py-2.5 ${showOnDesktop ? 'mt-0' : 'mt-3 lg:hidden'}`}>
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2F8] text-[#4C83B5]">
         <Clock className="h-4 w-4" />
       </span>

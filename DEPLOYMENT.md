@@ -32,6 +32,8 @@ Vercel Cron memanggil `/api/cron/complete-batches` setiap pukul 17.05 UTC (00.05
 
 Vercel Cron juga memanggil `/api/cron/complete-missions` setiap pukul 17.05 UTC (00.05 WIB). Misi yang tenggatnya sudah terlewati otomatis ditandai selesai dan tidak lagi ditampilkan kepada peserta. Pengumpulan tetap perlu divalidasi mentor; setelah disetujui, poin misi diberikan otomatis sesuai nilai saat misi dipublikasikan.
 
+Reward Store memakai tabel `reward_items`, `reward_redemptions`, dan `point_ledger`; migrasi skema aplikasi membuat tabel tersebut otomatis serta menginisialisasi kredit misi yang sudah disetujui. Upload gambar hadiah menggunakan folder Cloudinary `hadirku/rewards`, sehingga konfigurasi Cloudinary diperlukan untuk upload gambar (URL gambar tetap dapat dimasukkan langsung).
+
 ## TiDB Cloud
 
 Di dashboard TiDB, izinkan koneksi dari internet / `0.0.0.0/0` (atau setidaknya jangan kunci IP ke laptop saja). Egress IP Vercel berubah-ubah, jadi allowlist IP laptop akan membuat API terasa "mati" setelah di-deploy.
@@ -42,4 +44,4 @@ Jalankan `npm run migrate:tidb` sekali dari mesin yang bisa mengakses cluster, s
 
 1. Buka `https://<project>.vercel.app/api/health`. Harus JSON `status: "online"` dan `database: "TiDB Cloud"`. Jika HTML halaman login yang muncul, function API gagal di-build — cek log Function di Vercel.
 2. Jika JSON `503` dengan `error`, isi env yang disebut, lalu Redeploy.
-3. Uji login, data, check-in/out, unggah laporan, dan foto profil di deployment Preview dulu.
+3. Uji login, data, check-in/out, unggah laporan, foto profil, serta penukaran dan pembatalan hadiah di deployment Preview dulu.

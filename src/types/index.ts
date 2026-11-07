@@ -167,6 +167,62 @@ export interface DailyReport {
   reviewNotes?: string;    // komentar mentor / admin
 }
 
+export interface MentorDailyReport {
+  id: string;
+  mentorId: string;
+  mentorName: string;
+  mentorNim: string;
+  kejuruanId?: string;
+  kejuruanName?: string;
+  date: string;
+  activities: string;
+  achievements: string;
+  obstacles: string;
+  nextPlan: string;
+  submittedAt: string;
+}
+
+export interface RewardItem {
+  id: string;
+  title: string;
+  description: string;
+  pointsCost: number;
+  stock: number;
+  imageUrl: string;
+  imagePublicId?: string;
+  category: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type RewardRedemptionStatus = 'pending' | 'ready' | 'completed' | 'cancelled';
+
+export interface RewardRedemption {
+  id: string;
+  rewardId: string;
+  rewardTitle: string;
+  traineeId: string;
+  traineeName: string;
+  pointsSpent: number;
+  status: RewardRedemptionStatus;
+  pickupCode: string;
+  redeemedAt?: string;
+  completedAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  notes: string;
+}
+
+export interface RewardPointBalance {
+  earnedPoints: number;
+  latePenaltyPoints: number;
+  absentPenaltyPoints: number;
+  pointsSpent: number;
+  netBalance: number;
+  availablePoints: number;
+}
+
 export interface MissionSubmission {
   id: string;
   missionId: string;

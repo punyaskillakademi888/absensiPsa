@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { getTodayDateString, INDONESIAN_MONTHS } from '../../utils/dateUtils';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import { DEFAULT_PAGE_SIZE, Pagination } from '../Pagination';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -243,14 +243,25 @@ export const DailyReportView: React.FC = () => {
         }
         return true;
       })
-      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+      .sort((a, b) => b.date.localeCompare(a.date) || b.submittedAt.localeCompare(a.submittedAt));
   }, [dailyReports, isMentor, currentUser.kejuruanId, filterDate, filterStatus, filterKejuruan, searchQuery, kejuruanList]);
-  const reviewTotalPages = Math.max(1, Math.ceil(relevantReports.length / reviewPageSize));
+  const relevantReportDates = useMemo(
+    () => [...new Set(relevantReports.map(report => report.date))],
+    [relevantReports]
+  );
+  const reviewTotalPages = Math.max(1, Math.ceil(relevantReportDates.length / reviewPageSize));
   const currentReviewPage = Math.min(reviewPage, reviewTotalPages);
   const reviewStartIndex = (currentReviewPage - 1) * reviewPageSize;
+  const paginatedReportDates = useMemo(
+    () => relevantReportDates.slice(reviewStartIndex, reviewStartIndex + reviewPageSize),
+    [relevantReportDates, reviewStartIndex, reviewPageSize]
+  );
   const paginatedRelevantReports = useMemo(
-    () => relevantReports.slice(reviewStartIndex, reviewStartIndex + reviewPageSize),
-    [relevantReports, reviewStartIndex, reviewPageSize]
+    () => {
+      const visibleDates = new Set(paginatedReportDates);
+      return relevantReports.filter(report => visibleDates.has(report.date));
+    },
+    [relevantReports, paginatedReportDates]
   );
 
   useEffect(() => {
@@ -334,17 +345,11 @@ export const DailyReportView: React.FC = () => {
           </div>
         )}
 
-        {/* Header */}
-        <div>
-          <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase mb-1">
-            Jurnal Magang
-          </p>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#123B59]">Laporan Harian</h1>
-          <p className="text-xs text-[#6F7F8D] mt-0.5">
-            Upload foto dan catatan kegiatan harian kamu untuk diverifikasi mentor.
-          </p>
-          <MobileHeaderStatus />
-        </div>
+        <PageHeader
+          eyebrow="JURNAL MAGANG"
+          title="Laporan Harian"
+          description="Upload foto dan catatan kegiatan harian kamu untuk diverifikasi mentor."
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Submit Form */}
@@ -637,28 +642,21 @@ export const DailyReportView: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase mb-1">
-            Verifikasi
-          </p>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#123B59]">Laporan Harian Peserta</h1>
-          <p className="text-xs text-[#6F7F8D] mt-0.5">
-            Tinjau foto dan catatan kegiatan harian peserta, lalu berikan persetujuan atau catatan revisi.
-          </p>
-          <MobileHeaderStatus />
-        </div>
+      <PageHeader
+        eyebrow="VERIFIKASI"
+        title="Laporan Harian Peserta"
+        description="Tinjau foto dan catatan kegiatan harian peserta, lalu berikan persetujuan atau catatan revisi."
+      >
         {pendingCount > 0 && (
-          <div className="surface px-4 py-2.5 rounded-2xl flex items-center gap-3">
+          <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-[#D95B83] animate-pulse" />
             <div>
-              <p className="text-[10px] text-[#6F7F8D] font-semibold uppercase tracking-wider">Menunggu Review</p>
-              <p className="text-lg font-black text-[#123B59] leading-none">{pendingCount}</p>
+              <p className="text-[10px] text-white/70 font-semibold uppercase tracking-wider">Menunggu Review</p>
+              <p className="text-lg font-black text-white leading-none">{pendingCount}</p>
             </div>
           </div>
         )}
-      </div>
+      </PageHeader>
 
       {/* Filters */}
       <div className="surface rounded-2xl p-3 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
@@ -818,10 +816,10 @@ export const DailyReportView: React.FC = () => {
         <Pagination
           page={currentReviewPage}
           totalPages={reviewTotalPages}
-          totalItems={relevantReports.length}
+          totalItems={relevantReportDates.length}
           pageSize={reviewPageSize}
           startIndex={reviewStartIndex}
-          itemLabel="laporan"
+          itemLabel="hari"
           onPageChange={setReviewPage}
           onPageSizeChange={setReviewPageSize}
         />

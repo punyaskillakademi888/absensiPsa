@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import {
   FileText,
   CheckCircle2,
@@ -108,21 +108,13 @@ export const LeaveManagementView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header matching style.html */}
-      <div>
-        <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase">
-          PENGAJUAN
-        </p>
-        <h1 className="mt-1 font-bold text-2xl lg:text-3xl text-[#123B59]">
-          {isTrainee ? 'Ajukan Izin & Sakit' : currentUser.role === 'admin' ? 'Daftar Permohonan Izin' : 'Verifikasi Permohonan Izin'}
-        </h1>
-        <p className="mt-1 text-sm text-[#6F7F8D]">
-          {isTrainee
-            ? 'Formulir resmi ketidakhadiran peserta pelatihan & magang kejuruan.'
-            : currentUser.role === 'admin' ? 'Lihat permohonan izin dan lampiran peserta.' : 'Tinjau dan setujui surat permohonan izin atau surat keterangan sakit peserta.'}
-        </p>
-        <MobileHeaderStatus />
-      </div>
+      <PageHeader
+        eyebrow="PENGAJUAN"
+        title={isTrainee ? 'Ajukan Izin & Sakit' : currentUser.role === 'admin' ? 'Daftar Permohonan Izin' : 'Verifikasi Permohonan Izin'}
+        description={isTrainee
+          ? 'Formulir resmi ketidakhadiran peserta pelatihan & magang kejuruan.'
+          : currentUser.role === 'admin' ? 'Lihat permohonan izin dan lampiran peserta.' : 'Tinjau dan setujui surat permohonan izin atau surat keterangan sakit peserta.'}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_.9fr]">
         {/* Left Side: Form for Trainee, or Queue Metric for Mentor/Admin */}

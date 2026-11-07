@@ -98,7 +98,7 @@ export const countAbsentWorkDays = (input: {
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
 
   const allowedDays = new Set(
-    (input.workDays || []).map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6)
+    (input.workDays || []).map(Number).filter(day => Number.isInteger(day) && day >= 1 && day <= 5)
   );
   if (!allowedDays.size) return 0;
 

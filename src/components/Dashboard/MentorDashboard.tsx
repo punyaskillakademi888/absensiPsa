@@ -15,10 +15,11 @@ import {
   Trophy,
   FileText
 } from 'lucide-react';
-import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB } from '../../utils/dateUtils';
+import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB, isWeekend } from '../../utils/dateUtils';
 import { AttendanceStatus } from '../../types';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { getMentorKejuruanIds } from '../../utils/mentorKejuruan';
+import { PageHeader } from '../PageHeader';
 
 export const MentorDashboard: React.FC = () => {
   const {
@@ -40,6 +41,7 @@ export const MentorDashboard: React.FC = () => {
   } = useApp();
 
   const today = getTodayDateString();
+  const isHoliday = isWeekend(today);
   const [currentYear, currentMonth] = today.split('-').map(Number);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mentorNote, setMentorNote] = useState<string>('');
@@ -136,7 +138,7 @@ export const MentorDashboard: React.FC = () => {
     const totalPresent = hadir + telat;
     const totalTrainees = classTrainees.length;
     const rate = totalTrainees > 0 ? Math.round((totalPresent / totalTrainees) * 100) : 0;
-    const belumAbsen = Math.max(0, totalTrainees - (totalPresent + izin + sakit));
+    const belumAbsen = isHoliday ? 0 : Math.max(0, totalTrainees - (totalPresent + izin + sakit));
 
     return { hadir, telat, izin, sakit, pendingVerification, belumAbsen, totalPresent, rate };
   }, [classTodayRecords, classTrainees.length]);
@@ -148,12 +150,20 @@ export const MentorDashboard: React.FC = () => {
 
   // Mentor self check-in
   const handleMentorClockIn = async () => {
+    if (isHoliday) {
+      showToast('Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.');
+      return;
+    }
     const res = await clockIn(mentorNote || 'Hadir memfasilitasi pelatihan kelas kejuruan');
     showToast(res.message);
   };
 
   // Mentor self check-out
   const handleMentorClockOut = async () => {
+    if (isHoliday) {
+      showToast('Hari Sabtu dan Minggu merupakan hari libur. Presensi hanya dilakukan Senin sampai Jumat.');
+      return;
+    }
     const res = await clockOut('Sesi pelatihan kejuruan hari ini selesai');
     showToast(res.message);
   };
@@ -175,6 +185,10 @@ export const MentorDashboard: React.FC = () => {
 
   // Quick mark status for a trainee
   const handleQuickMark = (traineeId: string, status: AttendanceStatus) => {
+    if (isHoliday) {
+      showToast('Presensi peserta hanya dilakukan pada hari kerja, Senin sampai Jumat.');
+      return;
+    }
     const existing = classTodayRecords.find(r => r.userId === traineeId);
     if (existing) {
       markAttendanceStatus(existing.id, status, 'verified');
@@ -223,6 +237,14 @@ export const MentorDashboard: React.FC = () => {
         </div>
       )}
 
+      <PageHeader
+        eyebrow="DASHBOARD MENTOR"
+        title={`Selamat datang, ${currentUser.name}`}
+        description={isHoliday
+          ? `Hari libur akhir pekan · ${formatIndonesianDate(today)}. Mentor dan peserta tidak perlu melakukan presensi.`
+          : `Presensi kelas binaan · ${formatIndonesianDate(today)}`}
+      />
+
       {/* SECTION 1: PRESENSI MANDIRI MENTOR (Diverifikasi oleh Admin) */}
       <section className="surface soft-hover rounded-2xl p-5 border border-[#E4EAF0] space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4EAF0] pb-3">
@@ -242,7 +264,11 @@ export const MentorDashboard: React.FC = () => {
 
           {/* Verification Status by Admin Badge */}
           <div>
-            {!isMentorCheckedIn ? (
+            {isHoliday ? (
+              <span className="text-xs text-slate-600 font-bold bg-slate-100 px-3 py-1 rounded-full">
+                Hari Libur
+              </span>
+            ) : !isMentorCheckedIn ? (
               <span className="text-xs text-[#6F7F8D] font-bold bg-[#F4F6F8] px-3 py-1 rounded-full">
                 Belum Check-In Hari Ini
               </span>
@@ -262,7 +288,12 @@ export const MentorDashboard: React.FC = () => {
 
         {/* Mentor Action Terminal */}
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          {!isMentorCheckedIn ? (
+          {isHoliday ? (
+            <div className="flex-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-bold text-slate-700">Hari Libur</p>
+              <p className="mt-1 text-xs">Presensi mentor dan peserta tidak diperlukan pada hari Sabtu dan Minggu.</p>
+            </div>
+          ) : !isMentorCheckedIn ? (
             <div className="flex-1 w-full space-y-3">
               <input
                 type="text"
@@ -327,11 +358,11 @@ export const MentorDashboard: React.FC = () => {
           </span>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-bold tabular-nums text-[#28618F]">
-              {stats.rate}%
+              {isHoliday ? 'Libur' : `${stats.rate}%`}
             </span>
-            <span className="text-xs text-[#6F7F8D]">
+            {!isHoliday && <span className="text-xs text-[#6F7F8D]">
               ({stats.totalPresent}/{classTrainees.length})
-            </span>
+            </span>}
           </div>
         </article>
 
@@ -371,7 +402,7 @@ export const MentorDashboard: React.FC = () => {
               Verifikasi Presensi Peserta Kelas {mentorKejuruan.name}
             </h2>
             <p className="text-xs text-[#6F7F8D] mt-0.5">
-              Validasi catatan presensi peserta magang untuk hari ini.
+              {isHoliday ? 'Hari ini libur akhir pekan; presensi peserta tidak diperlukan.' : 'Validasi catatan presensi peserta magang untuk hari ini.'}
             </p>
           </div>
 
@@ -433,7 +464,7 @@ export const MentorDashboard: React.FC = () => {
 
                     <td className="py-3 px-3 font-mono text-[#123B59] tabular-nums">
                       {record?.checkInTime ? `${record.checkInTime} WIB` : (
-                        <span className="text-[#6F7F8D] italic">Belum hadir</span>
+                        <span className="text-[#6F7F8D] italic">{isHoliday ? 'Hari Libur' : 'Belum hadir'}</span>
                       )}
                     </td>
 
@@ -454,14 +485,14 @@ export const MentorDashboard: React.FC = () => {
                         </span>
                       ) : (
                         <span className="inline-flex whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-bold bg-[#F4F6F8] text-[#6F7F8D]">
-                          Belum Absen
+                          {isHoliday ? 'Hari Libur' : 'Belum Absen'}
                         </span>
                       )}
                     </td>
 
                     <td className="py-3 px-3">
                       {notCheckedIn ? (
-                        <span className="text-[#6F7F8D] text-[11px]">Menunggu Check-In</span>
+                        <span className="text-[#6F7F8D] text-[11px]">{isHoliday ? 'Tidak diperlukan' : 'Menunggu Check-In'}</span>
                       ) : isPending ? (
                         <span className="inline-flex items-center gap-1 font-bold text-[10px] bg-[#FFF5E6] text-[#C05621] px-2.5 py-1 rounded-full border border-amber-200">
                           <AlertTriangle className="w-3 h-3 shrink-0" />
@@ -495,6 +526,7 @@ export const MentorDashboard: React.FC = () => {
                           </button>
                         )}
 
+                        {!isHoliday && <>
                         {/* Quick Mark buttons */}
                         <button
                           type="button"
@@ -556,6 +588,7 @@ export const MentorDashboard: React.FC = () => {
                         >
                           A
                         </button>
+                        </>}
                       </div>
                     </td>
                   </tr>

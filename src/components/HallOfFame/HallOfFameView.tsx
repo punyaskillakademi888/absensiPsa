@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileHeaderStatus } from '../MobileHeaderStatus';
+import { PageHeader } from '../PageHeader';
 import { User, MissionSubmission, TraineeHallOfFameEntry } from '../../types';
 import { api } from '../../services/api';
 import {
@@ -192,41 +192,31 @@ export const HallOfFameView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col items-start gap-4">
-        <div>
-          <p className="text-[10px] font-bold tracking-[.14em] text-[#4C83B5] uppercase mb-1">
-            Papan Prestasi
-          </p>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#123B59]">
-            Hall of Fame &amp; Leaderboard
-          </h1>
-          <p className="text-xs text-[#6F7F8D] mt-0.5">
-            Papan peringkat seluruh peserta pelatihan vokasi dengan perolehan poin misi tertinggi.
-          </p>
-          <MobileHeaderStatus />
-        </div>
-
+      <PageHeader
+        eyebrow="PAPAN PRESTASI"
+        title="Hall of Fame & Leaderboard"
+        description="Papan peringkat seluruh peserta pelatihan vokasi dengan perolehan poin misi tertinggi."
+      >
         {currentUser.role === 'trainee' && myRanking && (
-          <div className="surface flex items-center gap-3 px-4 py-2.5 rounded-2xl">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5">
             <div className="text-center">
-              <span className="text-[10px] text-[#6F7F8D] block font-semibold uppercase tracking-wider">
+              <span className="text-[10px] text-white/70 block font-semibold uppercase tracking-wider">
                 Peringkat Anda
               </span>
-              <span className="text-lg font-black text-amber-600 font-mono">
+              <span className="text-lg font-black text-amber-300 font-mono">
                 #{myRanking.rank}
               </span>
             </div>
-            <div className="h-6 w-px bg-[#E4EAF0]" />
+            <div className="h-6 w-px bg-white/20" />
             <div>
-              <span className="text-[10px] text-[#6F7F8D] block font-semibold uppercase tracking-wider">
+              <span className="text-[10px] text-white/70 block font-semibold uppercase tracking-wider">
                 Total Poin
               </span>
-              <span className="text-sm font-bold text-[#123B59] font-mono">
+              <span className="text-sm font-bold text-white font-mono">
                 {myRanking.totalPoints} Pts
               </span>
             </div>
-            <div className="h-6 w-px bg-[#E4EAF0]" />
+            <div className="h-6 w-px bg-white/20" />
             <div>
               <span className="text-[10px] text-[#6F7F8D] block font-semibold uppercase tracking-wider">
                 Tingkat
@@ -237,7 +227,7 @@ export const HallOfFameView: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+      </PageHeader>
 
       {/* TOP 3 PODIUM HERO SECTION */}
       {rankings.length >= 3 && (
