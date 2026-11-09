@@ -1,22 +1,10 @@
-import * as XLSX from 'xlsx';
 import { User, Kejuruan, Role } from '../types';
+
+export { generate8DigitLoginCode, generateDefaultPassword } from './randomCredentials';
 
 /**
  * Generates an 8-digit random numeric code (e.g., "84920194")
  */
-export function generate8DigitLoginCode(): string {
-  // Generates an 8-digit integer string between 10000000 and 99999999
-  const num = Math.floor(10000000 + Math.random() * 90000000);
-  return num.toString();
-}
-
-/**
- * Generates an eight-digit numeric password.
- */
-export function generateDefaultPassword(): string {
-  return Math.floor(10000000 + Math.random() * 90000000).toString();
-}
-
 function readEightDigitValue(value: unknown): string {
   if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < 100000000) {
     return String(value).padStart(8, '0');
@@ -35,11 +23,11 @@ function importedKejuruanId(programName: string): string {
 /**
  * Export Trainees, Mentors, or All Users to Excel format (.xlsx)
  */
-export function exportUsersToExcel(
+export async function exportUsersToExcel(
   users: User[],
-  kejuruanList: Kejuruan[],
   filterRole: 'all' | 'trainee' | 'mentor' = 'all'
-): void {
+): Promise<void> {
+  const XLSX = await import('xlsx');
   const targetUsers = users.filter(u => u.role !== 'admin' && (filterRole === 'all' || u.role === filterRole));
 
   const wb = XLSX.utils.book_new();
@@ -71,10 +59,11 @@ export function exportUsersToExcel(
  * Download a blank sample Excel template for bulk import
  * Supports role-specific templates ('trainee', 'mentor', or 'all')
  */
-export function downloadUserImportTemplate(
+export async function downloadUserImportTemplate(
   kejuruanList: Kejuruan[],
   targetRole: 'all' | 'auto' | 'trainee' | 'mentor' = 'all'
-): void {
+): Promise<void> {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
   const headers = ['Nama Lengkap', 'NIM / Kode Login (8 Digit)', 'Sandi (8 Digit)', 'Program Kejuruan', 'Role'];
   const sheetName = targetRole === 'mentor' ? 'Mentor' : targetRole === 'trainee' ? 'Peserta' : 'Data Pengguna';
@@ -107,6 +96,7 @@ export async function parseUsersFromExcelFile(
   targetRole: 'auto' | 'trainee' | 'mentor' = 'auto'
 ): Promise<{ success: boolean; users?: Partial<User>[]; error?: string }> {
   try {
+    const XLSX = await import('xlsx');
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
 

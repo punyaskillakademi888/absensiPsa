@@ -301,12 +301,22 @@ export const MonthlyRecapView: React.FC = () => {
     records: attendanceRecords,
   };
 
-  const handleExportExcel = () => {
-    exportToExcel(exportParams);
+  const handleExportExcel = async () => {
+    try {
+      await exportToExcel(exportParams);
+    } catch (error) {
+      console.error('Gagal mengekspor rekap ke Excel:', error);
+      window.alert('Ekspor Excel gagal. Silakan coba lagi.');
+    }
   };
 
-  const handleExportPDF = () => {
-    exportToPDF(exportParams);
+  const handleExportPDF = async () => {
+    try {
+      await exportToPDF(exportParams);
+    } catch (error) {
+      console.error('Gagal mengekspor rekap ke PDF:', error);
+      window.alert('Ekspor PDF gagal. Silakan coba lagi.');
+    }
   };
 
   const handleResetAttendance = async () => {

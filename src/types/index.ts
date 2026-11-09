@@ -80,7 +80,7 @@ export interface AttendanceRecord {
   notes?: string;
   photoUrl?: string;
   rejectionReason?: string;
-  // Snapshot keterlambatan check-in: menit telat dan poin yang dipotong.
+  // Snapshot keterlambatan check-in untuk penalti setelah checkout dan verifikasi.
   lateMinutes?: number;
   latePenaltyPoints?: number;
 }

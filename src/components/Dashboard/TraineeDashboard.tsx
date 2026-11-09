@@ -7,11 +7,7 @@ import {
   FileText,
   Check,
   Calendar,
-  AlertCircle,
   AlertTriangle,
-  GraduationCap,
-  Target,
-  Trophy,
   LogIn,
   LogOut,
   CalendarClock,
@@ -23,7 +19,6 @@ import {
   formatIndonesianDate,
   formatShortDate,
   INDONESIAN_MONTHS,
-  INDONESIAN_DAYS,
   getCurrentTimeWIB,
   isWeekend
 } from '../../utils/dateUtils';
@@ -49,7 +44,6 @@ export const TraineeDashboard: React.FC = () => {
   const [currentYear, currentMonth] = today.split('-').map(Number);
   const monthName = INDONESIAN_MONTHS[currentMonth - 1];
 
-  const [liveTime, setLiveTime] = useState<string>('');
   const [dailyNote, setDailyNote] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -114,9 +108,7 @@ export const TraineeDashboard: React.FC = () => {
 
   useEffect(() => {
     const updateTime = () => {
-      const [hh, mm, ss] = getCurrentTimeWIB().split(':');
-      const timeStr = `${hh}.${mm}.${ss}`;
-      setLiveTime(timeStr);
+      const [hh, mm] = getCurrentTimeWIB().split(':');
       // Bandingkan HH:MM dengan batas toleransi dari pengaturan admin (mis. 09:00)
       const currentHHMM = `${hh}:${mm}`;
       const lateLimitHHMM = String(settings.lateLimitTime || '09:00').slice(0, 5);
@@ -165,15 +157,20 @@ export const TraineeDashboard: React.FC = () => {
     );
   };
 
-  const handleDownloadMyReport = () => {
-    exportToPDF({
-      year: currentYear,
-      month: currentMonth,
-      selectedKejuruanId: currentUser.kejuruanId || 'all',
-      kejuruanList,
-      trainees: [currentUser],
-      records: myRecords
-    });
+  const handleDownloadMyReport = async () => {
+    try {
+      await exportToPDF({
+        year: currentYear,
+        month: currentMonth,
+        selectedKejuruanId: currentUser.kejuruanId || 'all',
+        kejuruanList,
+        trainees: [currentUser],
+        records: myRecords
+      });
+    } catch (error) {
+      console.error('Gagal mengunduh rekap pribadi:', error);
+      showToast('Ekspor PDF gagal. Silakan coba lagi.');
+    }
   };
 
   // Calendar generation for mini calendar

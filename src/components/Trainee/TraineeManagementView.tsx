@@ -6,7 +6,6 @@ import {
   UserPlus,
   Plus,
   Search,
-  Filter,
   X,
   GraduationCap,
   FileSpreadsheet,
@@ -25,7 +24,7 @@ import {
   UserCheck,
   Loader2
 } from 'lucide-react';
-import { Kejuruan, User, Role } from '../../types';
+import { User, Role } from '../../types';
 import { Pagination } from '../Pagination';
 import {
   exportUsersToExcel,
@@ -87,8 +86,6 @@ export const TraineeManagementView: React.FC = () => {
   // New Kejuruan Form State
   const [newKjName, setNewKjName] = useState('');
   const [newKjCode, setNewKjCode] = useState('');
-  const [newKjCategory, setNewKjCategory] = useState('');
-  const [newKjColor, setNewKjColor] = useState('#2563eb');
   const [newKjMentorName, setNewKjMentorName] = useState('');
   const [newKjDesc, setNewKjDesc] = useState('');
 
@@ -192,8 +189,6 @@ export const TraineeManagementView: React.FC = () => {
     setIsAddUserModalOpen(true);
   };
 
-  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
-
   const handleRegenerateCredentialsForUser = async (userId: string, userName: string) => {
     const creds = await regenerateUserCredentials(userId);
     if (!creds.success) {
@@ -212,8 +207,6 @@ export const TraineeManagementView: React.FC = () => {
       showToast('NIM/Kode Login dan sandi harus masing-masing 8 digit angka.');
       return;
     }
-    setIsSubmittingUser(true);
-
     const res = await addUser({
       name: newUserName,
       role: newUserRole,
@@ -228,7 +221,6 @@ export const TraineeManagementView: React.FC = () => {
       avatar: `https://images.unsplash.com/photo-${newUserRole === 'mentor' ? '1534528741775-53994a69daeb' : '1535713875002-d1d0cf377fde'}?w=150`
     });
 
-    setIsSubmittingUser(false);
     if (res.success) {
       showToast(res.message);
       setIsAddUserModalOpen(false);
@@ -244,8 +236,8 @@ export const TraineeManagementView: React.FC = () => {
     addKejuruan({
       name: newKjName,
       code: newKjCode.toUpperCase(),
-      category: newKjCategory || 'Teknologi',
-      color: newKjColor,
+      category: 'Teknologi',
+      color: '#2563eb',
       mentorName: newKjMentorName || 'Instruktur Kejuruan',
       description: newKjDesc || 'Program kejuruan vokasi industri terapan.'
     });
@@ -259,9 +251,23 @@ export const TraineeManagementView: React.FC = () => {
   };
 
   // Excel Export
-  const handleExportExcel = () => {
-    exportUsersToExcel(users, kejuruanList, activeRoleFilter);
-    showToast('File Excel data akun peserta & mentor berhasil diunduh!');
+  const handleExportExcel = async () => {
+    try {
+      await exportUsersToExcel(users, activeRoleFilter);
+      showToast('File Excel data akun peserta & mentor berhasil diunduh!');
+    } catch (error) {
+      console.error('Gagal mengekspor data akun:', error);
+      showToast('Ekspor Excel gagal. Silakan coba lagi.');
+    }
+  };
+
+  const handleDownloadImportTemplate = async () => {
+    try {
+      await downloadUserImportTemplate(kejuruanList, importTargetRole);
+    } catch (error) {
+      console.error('Gagal mengunduh template impor:', error);
+      showToast('Template Excel gagal diunduh. Silakan coba lagi.');
+    }
   };
 
   // Excel Import Handling with explicit role separation
@@ -969,7 +975,7 @@ export const TraineeManagementView: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    onClick={() => downloadUserImportTemplate(kejuruanList, importTargetRole)}
+                    onClick={handleDownloadImportTemplate}
                     className="surface inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#C8DCEB] bg-white hover:bg-[#EAF2F8] text-[#123B59] text-[11px] font-bold cursor-pointer shadow-xs"
                     title="Unduh format template"
                   >

@@ -1,21 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageHeader } from '../PageHeader';
+import { useVisibleInterval } from '../../hooks/useVisibleInterval';
 import { User, MissionSubmission, TraineeHallOfFameEntry } from '../../types';
 import { api } from '../../services/api';
 import {
   Trophy,
-  Medal,
-  Award,
   Crown,
-  Sparkles,
-  CheckCircle2,
-  ChevronRight,
-  ExternalLink,
-  Flame,
-  Star,
-  Users,
-  Eye,
   X
 } from 'lucide-react';
 
@@ -36,42 +27,24 @@ interface TraineeRanking {
 }
 
 export const HallOfFameView: React.FC = () => {
-  const { users, missionSubmissions, currentUser, setActiveTab, getLatePenaltyPoints, getAbsentPenaltyPoints } = useApp();
+  const { users, missionSubmissions, currentUser, getLatePenaltyPoints, getAbsentPenaltyPoints } = useApp();
 
   const [selectedTraineeDetail, setSelectedTraineeDetail] = useState<TraineeRanking | null>(null);
   const [leaderboardTrainees, setLeaderboardTrainees] = useState<TraineeHallOfFameEntry[] | null>(null);
-  const [leaderboardStatus, setLeaderboardStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-
-  useEffect(() => {
-    if (currentUser.role !== 'trainee') {
-      setLeaderboardStatus('loaded');
-      return;
-    }
-
-    let active = true;
+  const [leaderboardStatus, setLeaderboardStatus] = useState<'loading' | 'loaded' | 'error'>(
+    currentUser.role === 'trainee' ? 'loading' : 'loaded'
+  );
+  useVisibleInterval(async () => {
     setLeaderboardStatus('loading');
-    const refresh = () => {
-      api.getTraineeHallOfFame()
-        .then(result => {
-          if (!active) return;
-          setLeaderboardTrainees(result.trainees);
-          setLeaderboardStatus('loaded');
-        })
-        .catch(error => {
-          console.warn('Could not fetch trainee leaderboard:', error);
-          if (active) setLeaderboardStatus('error');
-        });
-    };
-    refresh();
-    window.addEventListener('focus', refresh);
-    const timer = window.setInterval(refresh, 30000);
-
-    return () => {
-      active = false;
-      window.removeEventListener('focus', refresh);
-      window.clearInterval(timer);
-    };
-  }, [currentUser.role]);
+    try {
+      const result = await api.getTraineeHallOfFame();
+      setLeaderboardTrainees(result.trainees);
+      setLeaderboardStatus('loaded');
+    } catch (error) {
+      console.warn('Could not fetch trainee leaderboard:', error);
+      setLeaderboardStatus('error');
+    }
+  }, 60_000, currentUser.role === 'trainee');
 
   // All trainees
   const trainees = useMemo(() => {

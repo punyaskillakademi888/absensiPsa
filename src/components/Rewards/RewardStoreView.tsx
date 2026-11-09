@@ -1,5 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Clock3, Gift, ImagePlus, LoaderCircle, PackageCheck, Pencil, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
+import { Check, Clock3, Gift, ImagePlus, LoaderCircle, PackageCheck, Pencil, ShoppingBag, Trash2, X } from 'lucide-react';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { RewardItem, RewardPointBalance, RewardRedemption, RewardRedemptionStatus } from '../../types';

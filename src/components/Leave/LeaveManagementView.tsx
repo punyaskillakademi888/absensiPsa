@@ -3,14 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { PageHeader } from '../PageHeader';
 import {
   FileText,
-  CheckCircle2,
-  XCircle,
-  Clock,
   Paperclip,
-  Check,
-  X,
-  Calendar,
-  AlertCircle
+  Check
 } from 'lucide-react';
 import { getTodayDateString, formatIndonesianDate } from '../../utils/dateUtils';
 

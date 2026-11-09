@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { DailyReport } from '../../types';
 import { api } from '../../services/api';
 import {
-  FileImage,
   Upload,
   CheckCircle2,
   Clock,
@@ -11,8 +10,6 @@ import {
   X,
   Check,
   Search,
-  ChevronDown,
-  Eye,
   MessageSquare,
   ImageIcon,
   Send,
@@ -77,10 +74,8 @@ const TraineeAvatar: React.FC<{ src?: string; name: string; className: string }>
 export const DailyReportView: React.FC = () => {
   const {
     currentUser,
-    users,
     kejuruanList,
     dailyReports,
-    attendanceRecords,
     submitDailyReport,
     reviewDailyReport
   } = useApp();
@@ -106,7 +101,6 @@ export const DailyReportView: React.FC = () => {
   const [formPhotoName, setFormPhotoName] = useState<string | undefined>();
   const [formSubmissionLink, setFormSubmissionLink] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,7 +154,6 @@ export const DailyReportView: React.FC = () => {
     setFormError(null);
     setFormPhotoName(file.name);
     try {
-      setIsUploadingPhoto(true);
       const uploadResult = await api.uploadImageToCloudinary({
         file,
         folder: 'hadirku/reports',
@@ -176,8 +169,6 @@ export const DailyReportView: React.FC = () => {
       setFormPhotoUrl(undefined);
       setFormPhotoName(undefined);
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } finally {
-      setIsUploadingPhoto(false);
     }
   };
 
