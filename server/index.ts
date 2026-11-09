@@ -592,7 +592,7 @@ app.get(
   '/api/users',
   authenticateToken,
   authorizeRoles('admin', 'mentor'),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (_req: AuthenticatedRequest, res: Response) => {
     try {
       const pool = getPool();
       let query = `
@@ -1228,7 +1228,6 @@ const mentorCanManageProgram = (req: AuthenticatedRequest, kejuruanId: string) =
 app.get('/api/missions', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const pool = getPool();
-    await completeExpiredMissions(pool, getJakartaDateTime().date);
     let query = 'SELECT * FROM missions ORDER BY created_at DESC';
     let params: string[] = [];
     if (req.user?.role === 'mentor') {
@@ -1387,7 +1386,6 @@ app.put('/api/missions/:id', authenticateToken, authorizeRoles('mentor'), async 
   try {
     const pool = getPool();
     const today = getJakartaDateTime().date;
-    await completeExpiredMissions(pool, today);
     const [rows] = await pool.query<any[]>('SELECT * FROM missions WHERE id = ? LIMIT 1', [req.params.id]);
     const existing = rows[0];
     if (!existing) return res.status(404).json({ success: false, message: 'Misi tidak ditemukan.' });

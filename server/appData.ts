@@ -1,9 +1,8 @@
 import { Router, Response } from 'express';
-import type { PoolConnection } from 'mysql2/promise';
+import type { Pool, PoolConnection } from 'mysql2/promise';
 import { randomUUID } from 'node:crypto';
 import { getPool } from './db.js';
 import { getJakartaDateTime } from './attendanceAutoCheckout.js';
-import { completeExpiredMissions } from './missionLifecycle.js';
 import { authenticateToken, AuthenticatedRequest } from './auth.js';
 import { canonicalKejuruanCode } from './kejuruanCodes.js';
 import { WORK_DAYS } from '../src/utils/dateUtils.js';
@@ -31,16 +30,11 @@ const penaltySettingsFromRow = (row: any): LatePenaltySettings => ({
   latePointPenaltyPerMinute: normalizeLatePointPenaltyPerMinute(row?.late_point_penalty_per_minute),
 });
 
-const loadPenaltySettings = async (): Promise<LatePenaltySettings> => {
-  const [rows] = await getPool().query<any[]>(
+const loadPenaltySettings = async (executor: Pool | PoolConnection = getPool()): Promise<LatePenaltySettings> => {
+  const [rows] = await executor.query<any[]>(
     'SELECT late_limit_time, late_point_penalty_per_minute FROM attendance_settings ORDER BY updated_at DESC LIMIT 1'
   );
   return penaltySettingsFromRow(rows[0]);
-};
-
-// workDays tersimpan sebagai JSON (1 = Senin ... 0 = Minggu).
-const parseWorkDays = (setting: any): number[] => {
-  return [...WORK_DAYS];
 };
 
 // Tanggal yang dikecualikan dari hitungan "tidak absen": hari dengan check-in
@@ -139,11 +133,77 @@ const normalizedNameClause = (column: string, names: string[]) => names.length
   ? `LOWER(TRIM(${column})) IN (${names.map(() => '?').join(',')})`
   : '';
 
+async function loadAttendanceRows(
+  pool: Pool,
+  user: NonNullable<AuthenticatedRequest['user']>,
+  programRows?: any[]
+) {
+  if (user.role === 'admin') {
+    const [rows] = await pool.query<any[]>('SELECT * FROM attendance_records');
+    return rows;
+  }
+  if (user.role === 'trainee') {
+    const [rows] = await pool.query<any[]>(
+      'SELECT * FROM attendance_records WHERE user_id = ?',
+      [user.id]
+    );
+    return rows;
+  }
+
+  const programNames = assignedProgramNames(user);
+  let assignedPrograms = programRows;
+  if (!assignedPrograms) {
+    const nameClause = normalizedNameClause('name', programNames);
+    const [rows] = await pool.query<any[]>(
+      `SELECT id FROM kejuruan
+       WHERE id = ? OR mentor_id = ?${nameClause ? ` OR ${nameClause}` : ''}`,
+      [user.kejuruanId || '', user.id, ...programNames]
+    );
+    assignedPrograms = rows;
+  }
+
+  const programIds = [...new Set([
+    ...assignedPrograms.map((row: any) => String(row.id)),
+    ...(user.kejuruanId ? [String(user.kejuruanId)] : []),
+  ])];
+  const clauses = ['a.user_id = ?'];
+  const params: string[] = [user.id];
+  if (programIds.length) {
+    clauses.push(`a.kejuruan_id IN (${programIds.map(() => '?').join(',')})`);
+    params.push(...programIds);
+    clauses.push(`u.kejuruan_id IN (${programIds.map(() => '?').join(',')})`);
+    params.push(...programIds);
+  }
+  for (const column of ['a.kejuruan_name', 'u.kejuruan_name']) {
+    const nameClause = normalizedNameClause(column, programNames);
+    if (nameClause) {
+      clauses.push(nameClause);
+      params.push(...programNames);
+    }
+  }
+  const [rows] = await pool.query<any[]>(
+    `SELECT DISTINCT a.* FROM attendance_records a
+     LEFT JOIN users u ON u.id = a.user_id
+     WHERE ${clauses.map(clause => `(${clause})`).join(' OR ')}`,
+    params
+  );
+  return rows;
+}
+
+appDataRouter.get('/attendance', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const rows = await loadAttendanceRows(getPool(), req.user!);
+    return res.json({ success: true, attendanceRecords: rows.map(mapAttendance) });
+  } catch (error: any) {
+    console.error('[Attendance Refresh Error]', error);
+    return res.status(500).json({ success: false, message: 'Data presensi gagal dimuat ulang.' });
+  }
+});
+
 appDataRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
     const pool = getPool();
-    await completeExpiredMissions(pool, getJakartaDateTime().date);
     const scope = user.role === 'admin' ? null : user.role === 'mentor' ? user.kejuruanId || '' : user.id;
     const programNames = user.role === 'admin' ? [] : assignedProgramNames(user);
     const nameClause = normalizedNameClause('name', programNames);
@@ -190,35 +250,7 @@ appDataRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res:
       return rows;
     };
     const [scopedAttendanceRows, leaveRows, missionRows, scopedSubmissionRows, reportRows, settingRows] = await Promise.all([
-      user.role === 'mentor'
-        ? (async () => {
-            const clauses: string[] = [];
-            const params: string[] = [];
-            // A mentor's own attendance is keyed by users.id, independently of
-            // whether the mentor profile still has a matching program ID/name.
-            clauses.push('a.user_id = ?');
-            params.push(user.id);
-            if (mentorKejuruanIds.length) {
-              clauses.push(`a.kejuruan_id IN (${mentorKejuruanIds.map(() => '?').join(',')})`);
-              params.push(...mentorKejuruanIds);
-              clauses.push(`u.kejuruan_id IN (${mentorKejuruanIds.map(() => '?').join(',')})`);
-              params.push(...mentorKejuruanIds);
-            }
-            for (const column of ['a.kejuruan_name', 'u.kejuruan_name']) {
-              const nameClause = normalizedNameClause(column, programNames);
-              if (nameClause) {
-                clauses.push(nameClause);
-                params.push(...programNames);
-              }
-            }
-            if (!clauses.length) return [];
-            const [rows] = await pool.query<any[]>(
-              `SELECT DISTINCT a.* FROM attendance_records a LEFT JOIN users u ON u.id = a.user_id WHERE ${clauses.map(clause => `(${clause})`).join(' OR ')}`,
-              params
-            );
-            return rows;
-          })()
-        : scopedKejuruanQuery('attendance_records', 'user_id', [], [], user.id),
+      loadAttendanceRows(pool, user, kejuruanRows),
       scopedKejuruanQuery('leave_requests', user.role === 'trainee' ? 'user_id' : 'kejuruan_id', mentorKejuruanIds, programNames, user.id),
       scopedKejuruanQuery('missions', 'kejuruan_id', mentorKejuruanIds, programNames, user.kejuruanId || ''),
       user.role === 'mentor'
@@ -276,7 +308,7 @@ appDataRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res:
         absentPointPenaltyPerDay: normalizeAbsentPointPenaltyPerDay(
           setting.absent_point_penalty_per_day ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE
         ),
-        workDays: parseWorkDays(setting),
+        workDays: [...WORK_DAYS],
         officeLocation: legacyOfficePin ? {
           ...officeLocation,
           lat: -6.921045982595817,
@@ -300,7 +332,7 @@ appDataRouter.get('/hall-of-fame/trainees', authenticateToken, async (req: Authe
       'SELECT * FROM attendance_settings ORDER BY updated_at DESC LIMIT 1'
     );
     const setting = settingRows[0];
-    const workDays = parseWorkDays(setting);
+    const workDays = [...WORK_DAYS];
     const absentPointPenaltyPerDay = normalizeAbsentPointPenaltyPerDay(setting?.absent_point_penalty_per_day);
 
     const [rows] = await pool.query<any[]>(`
@@ -319,6 +351,7 @@ appDataRouter.get('/hall-of-fame/trainees', authenticateToken, async (req: Authe
           SELECT user_id, COALESCE(SUM(late_penalty_points), 0) AS total_penalty
           FROM attendance_records
           WHERE late_penalty_points > 0
+            AND check_out_time IS NOT NULL AND verification_status <> 'verified'
           GROUP BY user_id
         ) late_penalties ON late_penalties.user_id = u.id
         WHERE u.role = 'trainee'
@@ -643,7 +676,7 @@ appDataRouter.put('/attendance', authenticateToken, async (req: AuthenticatedReq
     }
     // Penalti keterlambatan memakai check-in efektif (request ini atau yang sudah
     // tersimpan) supaya retry tidak menghitung poin dua kali.
-    const penaltySettings = await loadPenaltySettings();
+    const penaltySettings = await loadPenaltySettings(connection);
     const latePenalty = computeLatePenalty(penaltySettings, {
       role: target.role,
       status: input.status,
@@ -987,7 +1020,7 @@ appDataRouter.put('/', authenticateToken, async (req: AuthenticatedRequest, res:
       `INSERT INTO kejuruan (id,name,code,category,color,description,mentor_id,mentor_name) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),code=VALUES(code),category=VALUES(category),color=VALUES(color),description=VALUES(description),mentor_id=VALUES(mentor_id),mentor_name=VALUES(mentor_name)`,
       [r.id,r.name,canonicalKejuruanCode(r.name, r.code),r.category,r.color,r.description || '',r.mentorId || null,r.mentorName || null]);
 
-    const penaltySettings = await loadPenaltySettings();
+    const penaltySettings = await loadPenaltySettings(connection);
     for (const r of lists.attendanceRecords) {
       if (user.role === 'trainee' && !own(r)) continue;
       await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [r.userId]);

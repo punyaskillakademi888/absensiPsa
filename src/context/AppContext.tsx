@@ -9,8 +9,7 @@ import {
   VerificationStatus,
   Mission,
   MissionSubmission,
-  DailyReport,
-  DailyReportStatus
+  DailyReport
 } from '../types';
 import {
   INITIAL_KEJURUAN,
@@ -18,7 +17,7 @@ import {
 } from '../data/mockData';
 import { getTodayDateString, getCurrentTimeWIB, isWeekend, WORK_DAYS } from '../utils/dateUtils';
 import { computeLatePenalty, computeAbsentPenalty, isLateCheckIn, normalizeLatePointPenaltyPerMinute, normalizeAbsentPointPenaltyPerDay, DEFAULT_LATE_POINT_PENALTY_PER_MINUTE } from '../utils/latePenalty';
-import { generate8DigitLoginCode, generateDefaultPassword } from '../utils/userExcelUtils';
+import { generate8DigitLoginCode, generateDefaultPassword } from '../utils/randomCredentials';
 import { canonicalizeKejuruanCatalog } from '../utils/kejuruanCodes';
 import confetti from 'canvas-confetti';
 import { api } from '../services/api';
@@ -81,7 +80,7 @@ interface AppContextType {
     feedback?: string
   ) => Promise<void>;
   getUserPoints: (userId: string) => number;
-  // Total poin yang dipotong karena keterlambatan check-in peserta.
+  // Penalti telat yang sudah berlaku setelah check-out dan verifikasi.
   getLatePenaltyPoints: (userId: string) => number;
   // Total poin yang dipotong karena hari kerja tanpa absen (sejak Oktober).
   getAbsentPenaltyPoints: (userId: string) => number;
@@ -485,7 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!jwtToken) return;
     try {
       if (attendanceWriteRef.current) await attendanceWriteRef.current;
-      const data = await api.getAppData();
+      const data = await api.getAttendanceRecords();
       if (data.success) setAttendanceRecords(data.attendanceRecords);
     } catch (error) {
       console.warn('Could not refresh attendance records from TiDB:', error);
@@ -629,7 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const appliedPenalty = savedRecord.latePenaltyPoints ?? latePenalty.latePenaltyPoints;
       const appliedMinutes = savedRecord.lateMinutes ?? latePenalty.lateMinutes;
       if (status === 'terlambat' && appliedPenalty > 0) {
-        msg += ` Perhatian: terlambat ${appliedMinutes} menit sehingga ${appliedPenalty} poin Hall of Fame Anda dikurangi (${appliedMinutes} menit x ${settings.latePointPenaltyPerMinute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE} poin).`;
+        msg += ` Potensi pengurangan ${appliedPenalty} poin (${appliedMinutes} menit x ${settings.latePointPenaltyPerMinute ?? DEFAULT_LATE_POINT_PENALTY_PER_MINUTE} poin) baru dihitung setelah check-out dan tidak berlaku jika presensi telah diverifikasi Mentor/Admin.`;
       }
     } else if (isMentor) {
       msg = savedRecord.checkInTime === currentTime
@@ -833,6 +832,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedRecord: AttendanceRecord = {
       ...record,
       status: newStatus,
+      checkInTime: record.checkInTime || (newStatus === 'hadir' ? '08:00:00' : undefined),
       verificationStatus: newVerification,
       verifiedBy: `${currentUser.name} (${currentUser.role === 'admin' ? 'Admin' : 'Mentor'})`,
       verifiedAt: `${getTodayDateString()} ${getCurrentTimeWIB()}`,
@@ -1231,7 +1231,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const getLatePenaltyPoints = (userId: string) => {
     return attendanceRecords
-      .filter(record => record.userId === userId)
+      .filter(record =>
+        record.userId === userId &&
+        !!record.checkOutTime &&
+        record.verificationStatus !== 'verified'
+      )
       .reduce((total, record) => total + computeLatePenalty(settings, {
         role: record.userRole,
         status: record.status,
@@ -1273,8 +1277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const earnedPoints = missionSubmissions
       .filter(s => s.traineeId === userId && s.status === 'approved')
       .reduce((sum, s) => sum + s.points, 0);
-    // Poin Hall of Fame peserta selalu dikurangi penalti keterlambatan dan
-    // ketidakhadiran check-in.
+    // Penalti telat baru berlaku setelah check-out dan hanya jika belum diverifikasi.
     return Math.max(
       0,
       earnedPoints - getLatePenaltyPoints(userId) - getAbsentPenaltyPoints(userId)
@@ -1340,7 +1343,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'pending',
       submittedAt: new Date().toISOString()
     };
-    const newReports: DailyReport[] = [...dailyReports, newReport];
     if (!jwtToken) return { success: false, message: 'Tidak terhubung ke server.' };
     try {
       const result = await api.submitDailyReport(newReport);

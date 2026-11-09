@@ -5,20 +5,15 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
-  FileSpreadsheet,
   Check,
   GraduationCap,
-  UserCheck,
-  ShieldCheck,
-  ChevronRight,
-  FileText
 } from 'lucide-react';
 import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB, isWeekend } from '../../utils/dateUtils';
 import { AttendanceStatus } from '../../types';
-import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
 import { DEFAULT_PAGE_SIZE, Pagination } from '../Pagination';
 import { PageHeader } from '../PageHeader';
+import { useVisibleInterval } from '../../hooks/useVisibleInterval';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -28,32 +23,20 @@ export const AdminDashboard: React.FC = () => {
     kejuruanList,
     attendanceRecords,
     refreshAttendanceRecords,
-    leaveRequests,
     verifyAttendance,
     markAttendanceStatus,
-    manualAddOrUpdateAttendance,
-    setActiveTab
+    manualAddOrUpdateAttendance
   } = useApp();
 
   const today = getTodayDateString();
   const isHoliday = isWeekend(today);
-  const [currentYear, currentMonth] = today.split('-').map(Number);
   const [selectedKejuruanFilter, setSelectedKejuruanFilter] = useState<string>('all');
   const [activeAdminView, setActiveAdminView] = useState<'mentors' | 'trainees'>('mentors');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mentorPage, setMentorPage] = useState(1);
   const [mentorPageSize, setMentorPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  useEffect(() => {
-    const refresh = () => void refreshAttendanceRecords();
-    refresh();
-    window.addEventListener('focus', refresh);
-    const timer = window.setInterval(refresh, 15000);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      window.clearInterval(timer);
-    };
-  }, [refreshAttendanceRecords]);
+  useVisibleInterval(refreshAttendanceRecords, 60_000, true, false);
 
   // A normal login starts with only the signed-in user in AppContext. Fetch
   // the complete admin-visible roster whenever this dashboard is opened.
@@ -241,6 +224,23 @@ export const AdminDashboard: React.FC = () => {
     showToast(`Presensi Mentor ${mentorName} berhasil diverifikasi!`);
   };
 
+  const handleVerifyTrainee = (recordId: string, traineeName: string) => {
+    verifyAttendance(recordId, 'verified');
+    showToast(`Presensi ${traineeName} berhasil diverifikasi oleh Admin.`);
+  };
+
+  const handleMarkTraineePresent = (traineeId: string, traineeName: string, recordId?: string) => {
+    const record = traineeTodayRecords.find(item => item.id === recordId);
+    manualAddOrUpdateAttendance(
+      traineeId,
+      today,
+      'hadir',
+      record?.checkInTime || '08:00:00',
+      'Presensi hadir diinput oleh Administrator'
+    );
+    showToast(`Presensi ${traineeName} ditetapkan hadir oleh Admin.`);
+  };
+
   // Handle Admin changing mentor status
   const handleSetMentorStatus = (
     mentorId: string,
@@ -271,28 +271,6 @@ export const AdminDashboard: React.FC = () => {
       }
     });
     showToast(`Semua presensi mentor (${pending.length}) berhasil diverifikasi!`);
-  };
-
-  const handleExportExcel = () => {
-    exportToExcel({
-      year: currentYear,
-      month: currentMonth,
-      selectedKejuruanId: selectedKejuruanFilter,
-      kejuruanList,
-      trainees,
-      records: attendanceRecords
-    });
-  };
-
-  const handleExportPDF = () => {
-    exportToPDF({
-      year: currentYear,
-      month: currentMonth,
-      selectedKejuruanId: selectedKejuruanFilter,
-      kejuruanList,
-      trainees,
-      records: attendanceRecords
-    });
   };
 
   return (
@@ -749,8 +727,9 @@ export const AdminDashboard: React.FC = () => {
                     <th className="py-3 px-3">Kejuruan</th>
                     <th className="py-3 px-3">Jam Masuk</th>
                     <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3">Status Verifikasi Mentor</th>
+                    <th className="py-3 px-3">Status Verifikasi</th>
                     <th className="py-3 px-4">Catatan</th>
+                    <th className="py-3 px-4 text-right">Aksi Admin</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E4EAF0]">
@@ -827,7 +806,7 @@ export const AdminDashboard: React.FC = () => {
                                 <div className="space-y-0.5">
                                   <span className="text-[#28618F] bg-[#EAF2F8] font-bold text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1 w-fit">
                                     <CheckCircle2 className="w-3 h-3 shrink-0 text-[#4C83B5]" />
-                                    <span>Terverifikasi Mentor</span>
+                                    <span>{record.verifiedBy?.includes('(Admin)') ? 'Terverifikasi Admin' : 'Terverifikasi Mentor'}</span>
                                   </span>
                                   {record.verifiedBy && (
                                     <div className="text-[10px] text-[#6F7F8D] truncate">
@@ -845,6 +824,33 @@ export const AdminDashboard: React.FC = () => {
 
                           <td className="py-3 px-4 text-[#6F7F8D] text-[11px] truncate max-w-[200px]">
                             {record?.notes || '-'}
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            {!isHoliday && (
+                              <div className="inline-flex items-center gap-1.5">
+                                {record && record.verificationStatus !== 'verified' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVerifyTrainee(record.id, trainee.name)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-[#123B59] hover:bg-[#0D2F47] text-white font-bold text-[10px] transition cursor-pointer"
+                                    title="Verifikasi presensi peserta sebagai Admin"
+                                  >
+                                    Verifikasi
+                                  </button>
+                                )}
+                                {(!record || record.status !== 'hadir' || record.verificationStatus !== 'verified') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMarkTraineePresent(trainee.id, trainee.name, record?.id)}
+                                    className="px-2.5 py-1.5 rounded-lg border border-[#A9C7DE] bg-[#EAF2F8] text-[#28618F] hover:bg-[#DCEBF5] font-bold text-[10px] transition cursor-pointer"
+                                    title="Input atau koreksi menjadi hadir; dibebaskan dari penalti keterlambatan"
+                                  >
+                                    Tandai Hadir
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );

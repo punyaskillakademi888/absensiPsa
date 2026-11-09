@@ -8,9 +8,9 @@ Frontend (Vite) dan backend (Express di `api/`) harus berada di **satu project V
 
 ## Environment variables
 
-Variabel TiDB harus tersedia pada tahap build karena Vercel menjalankan migrasi skema sebelum membangun frontend.
+Vercel hanya membangun frontend; build tidak terhubung ke database dan tidak menjalankan migrasi.
 
-Tambahkan variabel berikut pada Vercel Project Settings → Environment Variables untuk Production **dan** Preview. Isi nilainya di dashboard; jangan commit file `.env`.
+Tambahkan variabel runtime berikut pada Vercel Project Settings → Environment Variables untuk Production. Isi nilainya di dashboard; jangan commit file `.env`. Jangan berikan kredensial database Production ke Preview yang tidak dipercaya.
 
 Wajib:
 
@@ -24,7 +24,7 @@ Opsional:
 - `CLIENT_ORIGIN` hanya jika frontend dan API beda origin; beberapa origin dipisah koma
 - `VITE_API_URL` **harus kosong** jika frontend dan API satu domain Vercel. Jangan isi `http://localhost:...` di Production.
 
-Setelah mengubah env, klik **Redeploy** (tanpa cache jika function masih 404).
+Setelah mengubah env runtime, klik **Redeploy** (tanpa cache jika function masih 404).
 
 Vercel Cron memanggil `/api/cron/auto-checkout` setiap pukul 12.00 UTC (19.00 WIB). Record hari itu yang sudah check-in tetapi belum check-out akan ditutup pada pukul 19.00 WIB. Server Express yang berjalan terus juga menjalankan proses yang sama secara berkala setelah pukul 19.00 WIB.
 
@@ -32,13 +32,21 @@ Vercel Cron memanggil `/api/cron/complete-batches` setiap pukul 17.05 UTC (00.05
 
 Vercel Cron juga memanggil `/api/cron/complete-missions` setiap pukul 17.05 UTC (00.05 WIB). Misi yang tenggatnya sudah terlewati otomatis ditandai selesai dan tidak lagi ditampilkan kepada peserta. Pengumpulan tetap perlu divalidasi mentor; setelah disetujui, poin misi diberikan otomatis sesuai nilai saat misi dipublikasikan.
 
-Reward Store memakai tabel `reward_items`, `reward_redemptions`, dan `point_ledger`; migrasi skema aplikasi membuat tabel tersebut otomatis serta menginisialisasi kredit misi yang sudah disetujui. Upload gambar hadiah menggunakan folder Cloudinary `hadirku/rewards`, sehingga konfigurasi Cloudinary diperlukan untuk upload gambar (URL gambar tetap dapat dimasukkan langsung).
+Reward Store memakai tabel `reward_items`, `reward_redemptions`, dan `point_ledger`; migrasi skema aplikasi membuat tabel tersebut serta menginisialisasi kredit misi yang sudah disetujui.
 
 ## TiDB Cloud
 
 Di dashboard TiDB, izinkan koneksi dari internet / `0.0.0.0/0` (atau setidaknya jangan kunci IP ke laptop saja). Egress IP Vercel berubah-ubah, jadi allowlist IP laptop akan membuat API terasa "mati" setelah di-deploy.
 
-Jalankan `npm run migrate:tidb` sekali dari mesin yang bisa mengakses cluster, supaya tabel siap sebelum traffic production.
+## Migrasi database
+
+Migrasi tidak dijalankan otomatis saat build atau deploy. Sebelum migrasi ke Production:
+
+1. Pastikan database target dan environment sudah benar, lalu buat dan verifikasi backup yang dapat dipulihkan.
+2. Tinjau perubahan data di `server/db.ts`: selain perubahan skema, migrasi juga memperbarui riwayat penalti dan relasi program, serta memiliki operasi penghapusan baris program. Jangan jalankan pada Production tanpa meninjau dampak data.
+3. Jalankan `npm run migrate:schema` secara manual dari environment terkontrol yang memakai kredensial database target.
+4. Untuk referensi program Smart Creative yang yatim, jalankan `npm run repair:kejuruan-refs` terlebih dahulu untuk dry-run. Apply memerlukan `-- --apply --confirm-database=<nama-database> --backup-verified`; jalankan hanya setelah target, backup, dan jumlah baris yang akan diperbarui sudah diverifikasi.
+5. Ulangi pemeriksaan relasi dan uji aplikasi sebelum mengalihkan traffic.
 
 ## Pemeriksaan setelah deploy
 

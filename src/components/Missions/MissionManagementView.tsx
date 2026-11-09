@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { PageHeader } from '../PageHeader';
+import { useVisibleInterval } from '../../hooks/useVisibleInterval';
 import { Mission, MissionDifficulty, MissionSubmission } from '../../types';
 import {
   Target,
@@ -13,21 +14,17 @@ import {
   Award,
   Sparkles,
   Search,
-  Filter,
   Trash2,
   Edit3,
   X,
   Send,
-  MessageSquare,
   Check,
   ChevronRight,
-  FileText,
   UserCheck,
-  Calendar,
   Flame,
   RotateCcw
 } from 'lucide-react';
-import { formatIndonesianDate, getTodayDateString } from '../../utils/dateUtils';
+import { getTodayDateString } from '../../utils/dateUtils';
 import { getMentorKejuruanIds } from '../../utils/mentorKejuruan';
 import { getKejuruanFilterOptions, matchesKejuruanFilter } from '../../utils/kejuruanCodes';
 
@@ -54,7 +51,6 @@ const formatSubmissionDateTime = (value: string) => {
 export const MissionManagementView: React.FC = () => {
   const {
     currentUser,
-    users,
     kejuruanList,
     missions,
     missionSubmissions,
@@ -77,17 +73,7 @@ export const MissionManagementView: React.FC = () => {
   const isTrainee = currentUser.role === 'trainee';
   const normalizeProgramName = (name?: string) => name?.trim().toLowerCase().replace(/\s+/g, ' ');
 
-  useEffect(() => {
-    if (isAdmin || !jwtToken) return;
-    const refresh = () => void refreshMissions();
-    refresh();
-    window.addEventListener('focus', refresh);
-    const timer = window.setInterval(refresh, 15000);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      window.clearInterval(timer);
-    };
-  }, [isAdmin, currentUser.id, jwtToken, refreshMissions]);
+  useVisibleInterval(() => refreshMissions(), 60_000, !isAdmin && !!jwtToken, false);
   const mentorKejuruanIds = useMemo(
     () => getMentorKejuruanIds(currentUser, kejuruanList),
     [currentUser, kejuruanList]

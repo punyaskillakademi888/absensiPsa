@@ -1,25 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  Users,
   CheckCircle2,
-  Clock,
-  FileSpreadsheet,
   AlertTriangle,
   Check,
-  MapPin,
   CalendarCheck,
-  ShieldCheck,
-  UserCheck,
-  Target,
-  Trophy,
-  FileText
 } from 'lucide-react';
 import { getTodayDateString, formatIndonesianDate, getCurrentTimeWIB, isWeekend } from '../../utils/dateUtils';
 import { AttendanceStatus } from '../../types';
-import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { getMentorKejuruanIds } from '../../utils/mentorKejuruan';
 import { PageHeader } from '../PageHeader';
+import { useVisibleInterval } from '../../hooks/useVisibleInterval';
 
 export const MentorDashboard: React.FC = () => {
   const {
@@ -29,20 +20,16 @@ export const MentorDashboard: React.FC = () => {
     attendanceRecords,
     refreshUsers,
     refreshAttendanceRecords,
-    leaveRequests,
-    settings,
     clockIn,
     clockOut,
     getTodayRecordForUser,
     verifyAttendance,
     markAttendanceStatus,
-    manualAddOrUpdateAttendance,
-    setActiveTab
+    manualAddOrUpdateAttendance
   } = useApp();
 
   const today = getTodayDateString();
   const isHoliday = isWeekend(today);
-  const [currentYear, currentMonth] = today.split('-').map(Number);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mentorNote, setMentorNote] = useState<string>('');
 
@@ -71,19 +58,12 @@ export const MentorDashboard: React.FC = () => {
     .map(name => normalizeProgramName(name))
     .filter((name): name is string => !!name), [kejuruanList, mentorKejuruanIds, currentUser.kejuruanName, currentUser.name]);
 
-  useEffect(() => {
-    const refresh = () => {
-      void refreshAttendanceRecords();
-      void refreshUsers();
-    };
-    refresh();
-    window.addEventListener('focus', refresh);
-    const timer = window.setInterval(refresh, 15000);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      window.clearInterval(timer);
-    };
-  }, [currentUser.id, refreshAttendanceRecords, refreshUsers]);
+  useVisibleInterval(
+    () => Promise.all([refreshAttendanceRecords(), refreshUsers()]).then(() => undefined),
+    60_000,
+    true,
+    false
+  );
 
   const belongsToMentor = (kejuruanId?: string, kejuruanName?: string) => {
     const programName = normalizeProgramName(kejuruanName) || '';
@@ -203,28 +183,6 @@ export const MentorDashboard: React.FC = () => {
       );
     }
     showToast(`Status presensi diubah ke: ${status.toUpperCase()}`);
-  };
-
-  const handleExportClassExcel = () => {
-    exportToExcel({
-      year: currentYear,
-      month: currentMonth,
-      selectedKejuruanId: mentorKejuruan.id,
-      kejuruanList,
-      trainees: classTrainees,
-      records: attendanceRecords
-    });
-  };
-
-  const handleExportClassPDF = () => {
-    exportToPDF({
-      year: currentYear,
-      month: currentMonth,
-      selectedKejuruanId: mentorKejuruan.id,
-      kejuruanList,
-      trainees: classTrainees,
-      records: attendanceRecords
-    });
   };
 
   return (

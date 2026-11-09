@@ -1,22 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Sidebar } from './components/Sidebar';
-import { AdminDashboard } from './components/Dashboard/AdminDashboard';
-import { MentorDashboard } from './components/Dashboard/MentorDashboard';
-import { TraineeDashboard } from './components/Dashboard/TraineeDashboard';
-import { MonthlyRecapView } from './components/Recap/MonthlyRecapView';
-import { LeaveManagementView } from './components/Leave/LeaveManagementView';
-import { TraineeManagementView } from './components/Trainee/TraineeManagementView';
-import { SettingsView } from './components/Settings/SettingsView';
-import { ProfileView } from './components/Profile/ProfileView';
 import { LoginView } from './components/Auth/LoginView';
-import { MissionManagementView } from './components/Missions/MissionManagementView';
-import { HallOfFameView } from './components/HallOfFame/HallOfFameView';
-import { MentorHallOfFameView } from './components/HallOfFame/MentorHallOfFameView';
-import { DailyReportView } from './components/DailyReport/DailyReportView';
-import { MentorDailyReportView } from './components/DailyReport/MentorDailyReportView';
-import { RewardStoreView } from './components/Rewards/RewardStoreView';
 import { HeaderStatusContext } from './components/MobileHeaderStatus';
 import psaLogo from './assets/2D PSA LOGO.png';
 import {
@@ -25,8 +11,22 @@ import {
   CalendarCheck,
   FileText,
   UserRound,
-  FileSpreadsheet,
 } from 'lucide-react';
+
+const AdminDashboard = lazy(() => import('./components/Dashboard/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+const MentorDashboard = lazy(() => import('./components/Dashboard/MentorDashboard').then(module => ({ default: module.MentorDashboard })));
+const TraineeDashboard = lazy(() => import('./components/Dashboard/TraineeDashboard').then(module => ({ default: module.TraineeDashboard })));
+const MonthlyRecapView = lazy(() => import('./components/Recap/MonthlyRecapView').then(module => ({ default: module.MonthlyRecapView })));
+const LeaveManagementView = lazy(() => import('./components/Leave/LeaveManagementView').then(module => ({ default: module.LeaveManagementView })));
+const TraineeManagementView = lazy(() => import('./components/Trainee/TraineeManagementView').then(module => ({ default: module.TraineeManagementView })));
+const SettingsView = lazy(() => import('./components/Settings/SettingsView').then(module => ({ default: module.SettingsView })));
+const ProfileView = lazy(() => import('./components/Profile/ProfileView').then(module => ({ default: module.ProfileView })));
+const MissionManagementView = lazy(() => import('./components/Missions/MissionManagementView').then(module => ({ default: module.MissionManagementView })));
+const HallOfFameView = lazy(() => import('./components/HallOfFame/HallOfFameView').then(module => ({ default: module.HallOfFameView })));
+const MentorHallOfFameView = lazy(() => import('./components/HallOfFame/MentorHallOfFameView').then(module => ({ default: module.MentorHallOfFameView })));
+const DailyReportView = lazy(() => import('./components/DailyReport/DailyReportView').then(module => ({ default: module.DailyReportView })));
+const MentorDailyReportView = lazy(() => import('./components/DailyReport/MentorDailyReportView').then(module => ({ default: module.MentorDailyReportView })));
+const RewardStoreView = lazy(() => import('./components/Rewards/RewardStoreView').then(module => ({ default: module.RewardStoreView })));
 
 const MainLayout: React.FC = () => {
   const { currentUser, activeTab, setActiveTab, isAuthenticated, authReady } = useApp();
@@ -155,7 +155,11 @@ const MainLayout: React.FC = () => {
         </div>
         {/* Page Content View */}
         <HeaderStatusContext.Provider value={{ liveClock, roleBadgeLabel }}>
-          <main key={activeTab} className="page-enter min-w-0 w-full flex-1">{renderContent()}</main>
+          <main key={activeTab} className="page-enter min-w-0 w-full flex-1">
+            <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-sm font-semibold text-[#4C83B5]">Memuat halaman...</div>}>
+              {renderContent()}
+            </Suspense>
+          </main>
         </HeaderStatusContext.Provider>
 
         {/* Footer */}

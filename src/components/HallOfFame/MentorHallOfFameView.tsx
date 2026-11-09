@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Award, RotateCcw, Trophy } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { MentorHallOfFameEntry } from '../../types';
 import { PageHeader } from '../PageHeader';
+import { useVisibleInterval } from '../../hooks/useVisibleInterval';
 
 export const MentorHallOfFameView: React.FC = () => {
   const { currentUser, resetTraineeHallOfFamePoints } = useApp();
@@ -12,30 +13,17 @@ export const MentorHallOfFameView: React.FC = () => {
   const [loadError, setLoadError] = useState('');
   const [isResettingPoints, setIsResettingPoints] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    const refresh = () => {
-      api.getMentorHallOfFame()
-        .then(result => {
-          if (active) setRankings(result.mentors);
-        })
-        .catch(error => {
-          if (active) setLoadError(error.message || 'Gagal memuat poin mentor.');
-        })
-        .finally(() => {
-          if (active) setIsLoading(false);
-        });
-    };
-    refresh();
-    window.addEventListener('focus', refresh);
-    const timer = window.setInterval(refresh, 30000);
-
-    return () => {
-      active = false;
-      window.removeEventListener('focus', refresh);
-      window.clearInterval(timer);
-    };
-  }, []);
+  useVisibleInterval(async () => {
+    try {
+      const result = await api.getMentorHallOfFame();
+      setRankings(result.mentors);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Gagal memuat poin mentor.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, 60_000);
 
   const handleResetTraineePoints = async () => {
     if (!window.confirm('Nolkan seluruh poin peserta di Hall of Fame? Riwayat submission dan presensi mentor tetap tersimpan.')) return;

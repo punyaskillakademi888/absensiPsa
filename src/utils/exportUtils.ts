@@ -1,6 +1,3 @@
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { User, AttendanceRecord, Kejuruan } from '../types';
 import { INDONESIAN_MONTHS, getDatesForMonth, getDaysInMonth, isWeekend } from './dateUtils';
 import { matchesKejuruanFilter, getKejuruanFilterOptions } from './kejuruanCodes';
@@ -157,9 +154,10 @@ export function computeMonthlyRecapData(params: ExportParams): {
 /**
  * Export to Excel format (.xlsx)
  */
-export function exportToExcel(params: ExportParams): void {
+export async function exportToExcel(params: ExportParams): Promise<void> {
+  const XLSX = await import('xlsx');
   const { summaries, daysInMonth, monthName, kejuruanName } = computeMonthlyRecapData(params);
-  const { year, month } = params;
+  const { year } = params;
 
   // Build rows for Excel
   const isSingle = summaries.length === 1;
@@ -272,7 +270,11 @@ export function exportToExcel(params: ExportParams): void {
 /**
  * Export to PDF format (.pdf)
  */
-export function exportToPDF(params: ExportParams): void {
+export async function exportToPDF(params: ExportParams): Promise<void> {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
   const { summaries, monthName, kejuruanName, workingDaysCount } = computeMonthlyRecapData(params);
   const { year } = params;
   const isSingle = summaries.length === 1;

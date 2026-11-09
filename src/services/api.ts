@@ -156,6 +156,10 @@ export const api = {
     return this.request<{ success: boolean } & AppDataSnapshot>('/api/app-data');
   },
 
+  async getAttendanceRecords(): Promise<{ success: boolean; attendanceRecords: AttendanceRecord[] }> {
+    return this.request<{ success: boolean; attendanceRecords: AttendanceRecord[] }>('/api/app-data/attendance');
+  },
+
   async getTraineeHallOfFame(): Promise<{ success: boolean; trainees: TraineeHallOfFameEntry[] }> {
     return this.request<{ success: boolean; trainees: TraineeHallOfFameEntry[] }>('/api/app-data/hall-of-fame/trainees');
   },

@@ -75,7 +75,8 @@ async function getSpendableBalance(connection: PoolConnection, traineeId: string
   const [lateRows] = await connection.query<any[]>(
     `SELECT COALESCE(SUM(late_penalty_points), 0) AS points
      FROM attendance_records
-     WHERE user_id = ? AND late_penalty_points > 0`,
+     WHERE user_id = ? AND late_penalty_points > 0
+       AND check_out_time IS NOT NULL AND verification_status <> 'verified'`,
     [traineeId]
   );
   const [settingsRows] = await connection.query<any[]>(
